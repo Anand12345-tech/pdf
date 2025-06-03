@@ -1,0 +1,16 @@
+/* Add this to your existing CSS file or create a new one if it doesn't exist */
+
+.connector-name {
+    font-size: 0.8em;
+    color: #666;
+    font-style: italic;
+    margin-left: 8px;
+}
+
+/* Make sure the document title has enough space for the connector name */
+#document-title {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 5px;
+}

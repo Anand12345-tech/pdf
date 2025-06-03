@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shared PDF Document</title>
+    <link rel="stylesheet" href="/css/pdf-viewer.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script>
+        // Set PDF.js worker path
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+    </script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1 id="document-title">Shared Document</h1>
+        </header>
+        
+        <div class="pdf-container">
+            <div class="pdf-viewer" id="pdf-viewer">
+                <canvas id="pdf-canvas"></canvas>
+            </div>
+            
+            <div class="comments-panel">
+                <div class="comments-header">
+                    <h3>Comments</h3>
+                </div>
+                
+                <form id="comment-form">
+                    <input type="text" id="commenter-name" placeholder="Your name" required />
+                    <textarea placeholder="Add a comment..."></textarea>
+                    <button type="submit">Add Comment</button>
+                </form>
+                
+                <div id="comments-container">
+                    <!-- Comments will be loaded here -->
+                    <p class="loading">Loading comments...</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="pdf-controls">
+            <button id="prev-page">Previous Page</button>
+            <span id="page-info">Page <span id="current-page">1</span> of <span id="total-pages">1</span></span>
+            <button id="next-page">Next Page</button>
+        </div>
+    </div>
+    
+    <script src="/js/pdf-viewer.js"></script>
+    <script>
+        // Get token from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const token = urlParams.get('token');
+        const connector = urlParams.get('connector');
+        
+        if (!token) {
+            alert('No document token provided');
+        } else {
+            // Initialize the viewer
+            document.addEventListener('DOMContentLoaded', function() {
+                // Initialize PDF viewer
+                let pdfDoc = null;
+                let pageNum = 1;
+                let pageRendering = false;
+                let pageNumPending = null;
+                const scale = 1.5;
+                const canvas = document.getElementById('pdf-canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Initialize the comments system with connector name if available
+                window.PdfViewer.init(token, connector);
+                
+                // Load the PDF
+                fetch(`/api/Public/view-jwt/${token}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Failed to load document');
+                        }
+                        return response.blob();
+                    })
+                    .then(blob => {
+                        const url = URL.createObjectURL(blob);
+                        loadPdf(url);
+                    })
+                    .catch(error => {
+                        console.error('Error loading PDF:', error);
+                        document.getElementById('pdf-viewer').innerHTML = 
+                            '<div class="error-message">Failed to load document. It may have expired or been removed.</div>';
+                    });
+                
+                function loadPdf(url) {
+                    pdfjsLib.getDocument(url).promise.then(function(pdf) {
+                        pdfDoc = pdf;
+                        document.getElementById('total-pages').textContent = pdf.numPages;
+                        
+                        // Initial render
+                        renderPage(pageNum);
+                        
+                        // Get document info
+                        fetch(`/api/Public/view/${token}`)
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.document) {
+                                    document.getElementById('document-title').textContent = data.document.fileName;
+                                    document.title = data.document.fileName;
+                                }
+                            });
+                    });
+                }
+                
+                function renderPage(num) {
+                    pageRendering = true;
+                    
+                    // Update page counter
+                    document.getElementById('current-page').textContent = num;
+                    
+                    // Update comments for this page
+                    window.PdfViewer.changePage(num);
+                    
+                    // Render PDF page
+                    pdfDoc.getPage(num).then(function(page) {
+                        const viewport = page.getViewport({ scale });
+                        canvas.height = viewport.height;
+                        canvas.width = viewport.width;
+                        
+                        const renderContext = {
+                            canvasContext: ctx,
+                            viewport: viewport
+                        };
+                        
+                        const renderTask = page.render(renderContext);
+                        
+                        renderTask.promise.then(function() {
+                            pageRendering = false;
+                            
+                            if (pageNumPending !== null) {
+                                renderPage(pageNumPending);
+                                pageNumPending = null;
+                            }
+                        });
+                    });
+                }
+                
+                function queueRenderPage(num) {
+                    if (pageRendering) {
+                        pageNumPending = num;
+                    } else {
+                        renderPage(num);
+                    }
+                }
+                
+                function onPrevPage() {
+                    if (pageNum <= 1) {
+                        return;
+                    }
+                    pageNum--;
+                    queueRenderPage(pageNum);
+                }
+                
+                function onNextPage() {
+                    if (pageNum >= pdfDoc.numPages) {
+                        return;
+                    }
+                    pageNum++;
+                    queueRenderPage(pageNum);
+                }
+                
+                document.getElementById('prev-page').addEventListener('click', onPrevPage);
+                document.getElementById('next-page').addEventListener('click', onNextPage);
+            });
+        }
+    </script>
+</body>
+</html>

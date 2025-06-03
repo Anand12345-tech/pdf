@@ -1,0 +1,45 @@
+/* Add this to your existing CSS file or create a new one if it doesn't exist */
+
+.connector-name {
+    font-size: 0.8em;
+    color: #666;
+    font-style: italic;
+    margin-left: 8px;
+}
+
+/* Make sure the document title has enough space for the connector name */
+#document-title {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+/* Styles for the commenter name input fields */
+#commenter-name, .reply-name {
+    display: block;
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+/* Style for comment and reply forms */
+#comment-form, .reply-form {
+    margin-bottom: 20px;
+}
+
+/* Style for comment author and reply author */
+.comment-author, .reply-author {
+    font-weight: bold;
+    color: #333;
+}
+
+/* Reply form container */
+.reply-form-container {
+    margin-top: 10px;
+    padding: 10px;
+    background-color: #f9f9f9;
+    border-radius: 4px;
+}
