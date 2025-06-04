@@ -311,27 +311,33 @@ namespace PdfManagement.API.Controllers
         [SwaggerResponse(StatusCodes.Status500InternalServerError, "Server error")]
         public async Task<IActionResult> DownloadDocument(int id)
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "demo-user";
-            var document = await _pdfDocumentService.GetPdfByIdAsync(id);
-
-            if (document == null || document.UploaderId != userId)
-            {
-                return NotFound(new ApiResponse { Success = false, Message = "Document not found" });
-            }
-
             try
             {
+                // For demo purposes, don't check user ID
+                var document = await _pdfDocumentService.GetPdfByIdAsync(id);
+
+                if (document == null)
+                {
+                    return NotFound(new ApiResponse { Success = false, Message = "Document not found" });
+                }
+
                 var fileBytes = await _fileStorageService.GetFileAsync(document.FilePath);
+                
+                // Set CORS headers to allow download from any origin
+                Response.Headers.Add("Access-Control-Allow-Origin", "*");
+                Response.Headers.Add("Access-Control-Allow-Methods", "GET");
+                Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization");
+                
                 return File(fileBytes, document.ContentType, document.FileName);
             }
             catch (FileNotFoundException)
             {
                 return NotFound(new ApiResponse { Success = false, Message = "File not found" });
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 return StatusCode(StatusCodes.Status500InternalServerError, 
-                    new ApiResponse { Success = false, Message = "An error occurred while downloading the file" });
+                    new ApiResponse { Success = false, Message = $"An error occurred while downloading the file: {ex.Message}" });
             }
         }
         [HttpGet("view/{id}")]

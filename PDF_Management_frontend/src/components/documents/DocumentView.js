@@ -14,7 +14,7 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { Document, Page, pdfjs } from 'react-pdf';
 import CommentSection from './CommentSection';
-import { getDocument, getDocumentComments, viewDocument } from '../../services/api';
+import { getDocument, getDocumentComments, viewDocument, downloadDocument } from '../../services/api';
 
 // Set up the worker for react-pdf
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
@@ -263,9 +263,31 @@ const handleCommentDeleted = (commentId) => {
               <Button 
                 variant="outlined" 
                 color="primary"
-                href={document?.downloadUrl}
-                target="_blank"
-                rel="noopener noreferrer"
+                onClick={() => {
+                  try {
+                    setLoading(true);
+                    
+                    // Get API base URL from environment variables
+                    const apiBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+                    // Remove trailing /api if present to construct the correct URL
+                    const baseUrl = apiBaseUrl.endsWith('/api') 
+                      ? apiBaseUrl.slice(0, -4) 
+                      : apiBaseUrl.replace('/api', '');
+                    
+                    const downloadUrl = `${baseUrl}/api/PdfDocuments/download/${id}`;
+                    
+                    // Open in a new tab which will trigger the download
+                    window.open(downloadUrl, '_blank');
+                    
+                    setTimeout(() => {
+                      setLoading(false);
+                    }, 1000);
+                  } catch (error) {
+                    console.error('Download failed:', error);
+                    setError('Failed to download the document. Please try again later.');
+                    setLoading(false);
+                  }
+                }}
               >
                 Download PDF
               </Button>

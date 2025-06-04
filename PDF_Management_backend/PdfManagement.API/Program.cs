@@ -54,23 +54,9 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowedOrigins",
         policy => 
         {
-            var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? 
-                                new[] { "http://localhost:3000" };
-            
-            if (builder.Environment.IsDevelopment())
-            {
-                policy.WithOrigins("http://localhost:3000")
-                      .AllowAnyHeader()
-                      .AllowAnyMethod()
-                      .AllowCredentials();
-            }
-            else
-            {
-                policy.WithOrigins(allowedOrigins)
-                      .AllowAnyHeader()
-                      .AllowAnyMethod()
-                      .AllowCredentials();
-            }
+            policy.AllowAnyOrigin()
+                  .AllowAnyHeader()
+                  .AllowAnyMethod();
         });
 });
 

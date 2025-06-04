@@ -1,8 +1,13 @@
 import axios from 'axios';
 
 // Configure axios defaults
-const API_URL = process.env.REACT_APP_API_URL || 'https://localhost:5001/api';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 axios.defaults.baseURL = API_URL;
+
+// Remove any trailing /api from the baseURL if it's already in the API_URL
+if (axios.defaults.baseURL.endsWith('/api')) {
+  axios.defaults.baseURL = axios.defaults.baseURL.replace(/\/api$/, '');
+}
 
 // Add request interceptor to include auth token
 axios.interceptors.request.use(
@@ -90,6 +95,25 @@ export const viewDocument = async (id) => {
     throw error;
   }
 };
+
+export const downloadDocument = async (id) => {
+  try {
+    console.log(`Attempting to download document ${id}`);
+    const response = await axios.get(`/api/PdfDocuments/download/${id}`, {
+      responseType: 'blob'
+    });
+    console.log('Download response received:', response.status, response.headers);
+    return URL.createObjectURL(response.data);
+  } catch (error) {
+    console.error(`Error downloading document ${id}:`, error);
+    if (error.response) {
+      console.error('Response status:', error.response.status);
+      console.error('Response headers:', error.response.headers);
+    }
+    throw error;
+  }
+};
+
 export const deleteDocument = async (id) => {
   try {
     await axios.delete(`/api/PdfDocuments/${id}`);
@@ -194,6 +218,7 @@ export const deleteComment = async (commentId) => {
     throw error;
   }
 };
+
 export const shareDocumentJwt = async (id, expiresAt) => {
   try {
     const response = await axios.post(`/api/PdfDocuments/${id}/share-jwt`, { expiresAt });
