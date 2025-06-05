@@ -91,13 +91,19 @@ namespace PdfManagement.Core.Application.Services
                 claims.Add(new Claim(ClaimTypes.Role, role));
             }
 
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"] ?? string.Empty));
+            // First try to get JWT settings from environment variables, then fall back to configuration
+            var jwtKey = Environment.GetEnvironmentVariable("JWT_KEY") ?? _configuration["Jwt:Key"] ?? string.Empty;
+            var jwtIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER") ?? _configuration["Jwt:Issuer"] ?? string.Empty;
+            var jwtAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? _configuration["Jwt:Audience"] ?? string.Empty;
+            var jwtExpireDays = Environment.GetEnvironmentVariable("JWT_EXPIRE_DAYS") ?? _configuration["Jwt:ExpireDays"] ?? "7";
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-            var expires = DateTime.Now.AddDays(Convert.ToDouble(_configuration["Jwt:ExpireDays"] ?? "7"));
+            var expires = DateTime.Now.AddDays(Convert.ToDouble(jwtExpireDays));
 
             var token = new JwtSecurityToken(
-                _configuration["Jwt:Issuer"],
-                _configuration["Jwt:Audience"],
+                jwtIssuer,
+                jwtAudience,
                 claims,
                 expires: expires,
                 signingCredentials: creds

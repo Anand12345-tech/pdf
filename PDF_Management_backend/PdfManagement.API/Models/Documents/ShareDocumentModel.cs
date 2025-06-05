@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace PdfManagement.API.Models.Documents
 {
@@ -8,7 +9,7 @@ namespace PdfManagement.API.Models.Documents
     /// </summary>
     public class ShareDocumentModel
     {
-        [Required]
+        [JsonPropertyName("expiresAt")]
         public DateTime? ExpiresAt { get; set; }
     }
 }

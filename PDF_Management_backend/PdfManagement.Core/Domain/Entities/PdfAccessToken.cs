@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace PdfManagement.Core.Domain.Entities
 {
@@ -10,8 +11,13 @@ namespace PdfManagement.Core.Domain.Entities
         public int Id { get; set; }
         public int DocumentId { get; set; }
         public Guid Token { get; set; }
+        
+        [Column(TypeName = "timestamp without time zone")]
         public DateTime CreatedAt { get; set; }
+        
+        [Column(TypeName = "timestamp without time zone")]
         public DateTime ExpiresAt { get; set; }
+        
         public bool IsRevoked { get; set; }
         
         // Navigation property

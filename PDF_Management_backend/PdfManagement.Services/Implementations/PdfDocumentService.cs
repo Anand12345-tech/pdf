@@ -92,29 +92,41 @@ namespace PdfManagement.Services.Implementations
         /// <inheritdoc/>
         public async Task<PdfAccessToken> GenerateAccessTokenAsync(int pdfId, string userId, DateTime? expiresAt = null)
         {
-            var document = await _pdfDocumentRepository.GetByIdAsync(pdfId);
-            
-            if (document == null || document.UploaderId != userId)
+            try
             {
-                throw new ArgumentException("Document not found or you don't have permission to share it.");
+                var document = await _pdfDocumentRepository.GetByIdAsync(pdfId);
+                
+                if (document == null || document.UploaderId != userId)
+                {
+                    throw new ArgumentException("Document not found or you don't have permission to share it.");
+                }
+                
+                // Default expiration is 7 days
+                if (!expiresAt.HasValue || expiresAt.Value <= DateTime.UtcNow)
+                {
+                    expiresAt = DateTime.UtcNow.AddDays(7);
+                }
+                
+                var token = new PdfAccessToken
+                {
+                    DocumentId = pdfId,
+                    Token = Guid.NewGuid(),
+                    CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+                    ExpiresAt = DateTime.SpecifyKind(expiresAt.Value, DateTimeKind.Unspecified),
+                    IsRevoked = false
+                };
+                
+                return await _pdfDocumentRepository.CreateAccessTokenAsync(token);
             }
-            
-            // Default expiration is 7 days
-            if (!expiresAt.HasValue || expiresAt.Value <= DateTime.UtcNow)
+            catch (Exception ex)
             {
-                expiresAt = DateTime.UtcNow.AddDays(7);
+                Console.WriteLine($"Error in GenerateAccessTokenAsync: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                }
+                throw new Exception($"Failed to generate access token for document {pdfId}: {ex.Message}", ex);
             }
-            
-            var token = new PdfAccessToken
-            {
-                DocumentId = pdfId,
-                Token = Guid.NewGuid(),
-                CreatedAt = DateTime.UtcNow,
-                ExpiresAt = expiresAt.Value,
-                IsRevoked = false
-            };
-            
-            return await _pdfDocumentRepository.CreateAccessTokenAsync(token);
         }
 
         /// <inheritdoc/>
@@ -128,7 +140,7 @@ namespace PdfManagement.Services.Implementations
                 await _pdfDocumentRepository.LogAccessAsync(new PdfAccessLog
                 {
                     DocumentId = document.Id,
-                    AccessedAt = DateTime.UtcNow,
+                    AccessedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
                     IpAddress = ipAddress,
                     UserAgent = userAgent
                 });
@@ -141,8 +153,10 @@ namespace PdfManagement.Services.Implementations
         public async Task<bool> ValidateTokenAsync(Guid token)
         {
             var accessToken = await _pdfDocumentRepository.GetAccessTokenAsync(token);
+            var now = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+            
             return accessToken != null && 
-                   accessToken.ExpiresAt > DateTime.UtcNow && 
+                   accessToken.ExpiresAt > now && 
                    !accessToken.IsRevoked;
         }
 

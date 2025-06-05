@@ -108,16 +108,24 @@ namespace PdfManagement.Core.Application.Services
                 expiresAt = DateTime.UtcNow.AddDays(7);
             }
             
-            var token = new PdfAccessToken
+            try
             {
-                DocumentId = pdfId,
-                Token = Guid.NewGuid(),
-                CreatedAt = DateTime.UtcNow,
-                ExpiresAt = expiresAt.Value,
-                IsRevoked = false
-            };
-            
-            return await _pdfDocumentRepository.CreateAccessTokenAsync(token);
+                var token = new PdfAccessToken
+                {
+                    DocumentId = pdfId,
+                    Token = Guid.NewGuid(),
+                    CreatedAt = DateTime.UtcNow,
+                    ExpiresAt = expiresAt.Value,
+                    IsRevoked = false
+                };
+                
+                return await _pdfDocumentRepository.CreateAccessTokenAsync(token);
+            }
+            catch (Exception ex)
+            {
+                // Add more context to the exception
+                throw new Exception($"Failed to generate access token for document {pdfId}: {ex.Message}", ex);
+            }
         }
 
         /// <inheritdoc/>

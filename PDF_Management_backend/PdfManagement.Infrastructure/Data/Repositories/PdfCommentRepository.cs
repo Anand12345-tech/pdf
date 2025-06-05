@@ -52,17 +52,7 @@ namespace PdfManagement.Infrastructure.Data.Repositories
         public override async Task<PdfComment> AddAsync(PdfComment comment)
         {
             await _context.PdfComments.AddAsync(comment);
-            await _context.SaveChangesAsync();
-            
-            // Reload the comment with the commenter
-            if (comment.CommenterId != null)
-            {
-                var reloadedComment = await _context.PdfComments
-                    .Include(c => c.Commenter)
-                    .FirstOrDefaultAsync(c => c.Id == comment.Id);
-                    
-                return reloadedComment ?? comment;
-            }
+            // Don't save changes here, let the service handle it with proper transaction management
             
             return comment;
         }
@@ -88,7 +78,18 @@ namespace PdfManagement.Infrastructure.Data.Repositories
             }
             
             _context.PdfComments.Remove(comment);
-            return await _context.SaveChangesAsync() > 0;
+            // Don't save changes here, let the service handle it with proper transaction management
+            
+            return true;
+        }
+
+        /// <inheritdoc/>
+        public override async Task<bool> UpdateAsync(PdfComment entity)
+        {
+            _context.Entry(entity).State = EntityState.Modified;
+            // Don't save changes here, let the service handle it with proper transaction management
+            
+            return true;
         }
     }
 }

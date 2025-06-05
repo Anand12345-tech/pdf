@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using System;
 using System.Threading.Tasks;
 
@@ -8,6 +9,11 @@ namespace PdfManagement.Core.Domain.Interfaces
     /// </summary>
     public interface IUnitOfWork : IDisposable
     {
+        /// <summary>
+        /// Gets the database context
+        /// </summary>
+        DbContext Context { get; }
+        
         /// <summary>
         /// Gets a repository for a specific entity type
         /// </summary>

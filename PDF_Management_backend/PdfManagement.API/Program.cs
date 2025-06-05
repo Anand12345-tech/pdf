@@ -14,26 +14,122 @@ using PdfManagement.Core.Domain.Interfaces;
 using PdfManagement.Infrastructure.Data.Context;
 using PdfManagement.Infrastructure.Data.Repositories;
 using PdfManagement.Infrastructure.Services;
+using Microsoft.EntityFrameworkCore;
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
+
+// Load environment variables from .env file
+var envFilePath = Path.Combine(Directory.GetCurrentDirectory(), ".env");
+if (File.Exists(envFilePath))
+{
+    foreach (var line in File.ReadAllLines(envFilePath))
+    {
+        if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#"))
+            continue;
+            
+        var parts = line.Split('=', 2);
+        if (parts.Length == 2)
+        {
+            var key = parts[0].Trim();
+            var value = parts[1].Trim();
+            
+            // Don't override existing environment variables
+            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(key)))
+            {
+                Environment.SetEnvironmentVariable(key, value);
+            }
+        }
+    }
+    Console.WriteLine("Loaded environment variables from .env file");
+}
+else
+{
+    // Try parent directory as fallback
+    envFilePath = Path.Combine(Directory.GetCurrentDirectory(), "..", ".env");
+    if (File.Exists(envFilePath))
+    {
+        foreach (var line in File.ReadAllLines(envFilePath))
+        {
+            if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#"))
+                continue;
+                
+            var parts = line.Split('=', 2);
+            if (parts.Length == 2)
+            {
+                var key = parts[0].Trim();
+                var value = parts[1].Trim();
+                
+                // Don't override existing environment variables
+                if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(key)))
+                {
+                    Environment.SetEnvironmentVariable(key, value);
+                }
+            }
+        }
+        Console.WriteLine("Loaded environment variables from parent directory .env file");
+    }
+    else
+    {
+        Console.WriteLine(".env file not found, using system environment variables");
+    }
+}
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 // Configure Kestrel to listen on all addresses
 builder.WebHost.ConfigureKestrel(serverOptions =>
 {
-    serverOptions.ListenAnyIP(5000); // Listen on port 5000 for HTTP
-    serverOptions.ListenAnyIP(5001, listenOptions => // Listen on port 5001 for HTTPS
+    serverOptions.ListenAnyIP(5002); // Listen on port 5002 for HTTP
+    serverOptions.ListenAnyIP(5003, listenOptions => // Listen on port 5003 for HTTPS
     {
         listenOptions.UseHttps();
     });
 });
 
 // Add services to the container.
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+//builder.Services.AddDbContext<ApplicationDbContext>(options =>
+//    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+// Get connection string from environment variable or configuration
+var connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING") ?? 
+                      builder.Configuration.GetConnectionString("DefaultConnection");
+
+// Add logging to debug connection issues
+Console.WriteLine($"Using connection string: {MaskConnectionString(connectionString)}");
+
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+{
+    options.UseNpgsql(connectionString, npgsqlOptions =>
+    {
+        // Add retry logic for transient errors
+        npgsqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 5,
+            maxRetryDelay: TimeSpan.FromSeconds(30),
+            errorCodesToAdd: null);
+    });
+});
+
+// Helper method to safely mask connection string
+static string MaskConnectionString(string connectionString)
+{
+    if (string.IsNullOrEmpty(connectionString)) return string.Empty;
+    
+    try
+    {
+        // Simple approach to mask password
+        return Regex.Replace(connectionString, 
+            @"Password=([^;]*)", 
+            "Password=***", 
+            RegexOptions.IgnoreCase);
+    }
+    catch
+    {
+        // If anything goes wrong, return a safe version
+        return "Connection string present but not displayed for security";
+    }
+}
 
 // Register repositories
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
@@ -54,9 +150,32 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowedOrigins",
         policy => 
         {
-            policy.AllowAnyOrigin()
-                  .AllowAnyHeader()
-                  .AllowAnyMethod();
+            var allowedOriginsEnv = Environment.GetEnvironmentVariable("ALLOWED_ORIGINS");
+            string[] allowedOrigins;
+            
+            if (!string.IsNullOrEmpty(allowedOriginsEnv))
+            {
+                allowedOrigins = allowedOriginsEnv.Split(',')
+                    .Where(o => !string.IsNullOrWhiteSpace(o))
+                    .ToArray();
+            }
+            else
+            {
+                allowedOrigins = new[] { "http://localhost:3000" };
+            }
+            
+            if (allowedOrigins.Length > 0)
+            {
+                policy.WithOrigins(allowedOrigins)
+                      .AllowAnyHeader()
+                      .AllowAnyMethod();
+            }
+            else
+            {
+                policy.AllowAnyOrigin()
+                      .AllowAnyHeader()
+                      .AllowAnyMethod();
+            }
         });
 });
 
@@ -83,19 +202,25 @@ builder.Services.AddAuthentication(options =>
         ValidateAudience = true,
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
-        ValidIssuer = builder.Configuration["Jwt:Issuer"],
-        ValidAudience = builder.Configuration["Jwt:Audience"],
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"] ?? string.Empty))
+        ValidIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER") ?? builder.Configuration["Jwt:Issuer"],
+        ValidAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? builder.Configuration["Jwt:Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(
+            Encoding.UTF8.GetBytes(
+                Environment.GetEnvironmentVariable("JWT_KEY") ?? 
+                builder.Configuration["Jwt:Key"] ?? 
+                string.Empty
+            )
+        )
     };
 });
-
 
 // Configure health checks
 builder.Services.AddHealthChecks()
     .AddCheck<DbContextHealthCheck<ApplicationDbContext>>("database")
     .AddCheck("storage", () => {
         try {
-            var storagePath = builder.Configuration["Storage:BasePath"];
+            var storagePath = Environment.GetEnvironmentVariable("STORAGE_PATH") ?? 
+                             builder.Configuration["Storage:BasePath"];
             if (string.IsNullOrEmpty(storagePath) || !Directory.Exists(storagePath)) {
                 return Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Unhealthy("Storage path is not configured or does not exist");
             }
@@ -104,7 +229,6 @@ builder.Services.AddHealthChecks()
             return Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Unhealthy(ex.Message);
         }
     });
-
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -137,8 +261,6 @@ builder.Services.AddSwaggerGen(c =>
         }
     });
 });
-
-
 
 var app = builder.Build();
 
@@ -244,6 +366,6 @@ app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthC
 // Simple health check endpoint
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
 
-Console.WriteLine("Starting PDF Management API on ports 5002 (HTTP) and 5003 (HTTPS)");
+Console.WriteLine("Starting PDF Management API on ports 5000 (HTTP) and 5001 (HTTPS)");
 
 app.Run();

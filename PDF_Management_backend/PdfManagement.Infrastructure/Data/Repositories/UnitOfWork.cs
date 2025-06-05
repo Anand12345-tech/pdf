@@ -8,9 +8,6 @@ using System.Threading.Tasks;
 
 namespace PdfManagement.Infrastructure.Data.Repositories
 {
-    /// <summary>
-    /// Unit of work implementation for transaction management
-    /// </summary>
     public class UnitOfWork : IUnitOfWork
     {
         private readonly ApplicationDbContext _context;
@@ -24,32 +21,28 @@ namespace PdfManagement.Infrastructure.Data.Repositories
             _repositories = new Dictionary<Type, object>();
         }
 
-        /// <inheritdoc/>
+        public DbContext Context => _context; // Expose for strategy access
+
         public IRepository<TEntity> GetRepository<TEntity>() where TEntity : class
         {
             var type = typeof(TEntity);
-            
             if (!_repositories.ContainsKey(type))
             {
                 _repositories[type] = new Repository<TEntity>(_context);
             }
-            
             return (IRepository<TEntity>)_repositories[type];
         }
 
-        /// <inheritdoc/>
         public async Task<int> SaveChangesAsync()
         {
             return await _context.SaveChangesAsync();
         }
 
-        /// <inheritdoc/>
         public async Task BeginTransactionAsync()
         {
             _transaction = await _context.Database.BeginTransactionAsync();
         }
 
-        /// <inheritdoc/>
         public async Task CommitTransactionAsync()
         {
             try
@@ -70,7 +63,6 @@ namespace PdfManagement.Infrastructure.Data.Repositories
             }
         }
 
-        /// <inheritdoc/>
         public async Task RollbackTransactionAsync()
         {
             try
@@ -90,7 +82,6 @@ namespace PdfManagement.Infrastructure.Data.Repositories
             }
         }
 
-        /// <inheritdoc/>
         public void Dispose()
         {
             Dispose(true);
@@ -104,7 +95,7 @@ namespace PdfManagement.Infrastructure.Data.Repositories
                 _transaction?.Dispose();
                 _context.Dispose();
             }
-            
+
             _disposed = true;
         }
     }

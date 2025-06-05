@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PdfManagement.Core.Domain.Entities;
+using System;
 
 namespace PdfManagement.Infrastructure.Data.Context
 {
@@ -22,6 +24,22 @@ namespace PdfManagement.Infrastructure.Data.Context
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
+
+            // Configure DateTime properties for PdfAccessToken to use timestamp without time zone
+            var dateTimeConverter = new ValueConverter<DateTime, DateTime>(
+                v => v,
+                v => DateTime.SpecifyKind(v, DateTimeKind.Unspecified)
+            );
+
+            builder.Entity<PdfAccessToken>()
+                .Property(e => e.CreatedAt)
+                .HasColumnType("timestamp without time zone")
+                .HasConversion(dateTimeConverter);
+
+            builder.Entity<PdfAccessToken>()
+                .Property(e => e.ExpiresAt)
+                .HasColumnType("timestamp without time zone")
+                .HasConversion(dateTimeConverter);
 
             // Configure PdfDocument entity
             builder.Entity<PdfDocument>(entity =>
@@ -69,8 +87,6 @@ namespace PdfManagement.Infrastructure.Data.Context
             {
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Token).IsRequired();
-                entity.Property(e => e.CreatedAt).IsRequired();
-                entity.Property(e => e.ExpiresAt).IsRequired();
                 entity.Property(e => e.IsRevoked).IsRequired();
 
                 entity.HasOne(e => e.Document)

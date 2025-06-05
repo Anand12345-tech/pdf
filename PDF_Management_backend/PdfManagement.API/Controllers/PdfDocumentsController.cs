@@ -188,6 +188,19 @@ namespace PdfManagement.API.Controllers
             
             try
             {
+                // First check if the document exists and belongs to the user
+                var document = await _pdfDocumentService.GetPdfByIdAsync(id);
+                if (document == null || document.UploaderId != userId)
+                {
+                    return NotFound(new ApiResponse { Success = false, Message = "Document not found" });
+                }
+                
+                // If model.ExpiresAt is null, set a default value
+                if (model.ExpiresAt == null)
+                {
+                    model.ExpiresAt = DateTime.UtcNow.AddDays(7);
+                }
+                
                 var token = await _pdfDocumentService.GenerateAccessTokenAsync(
                     id, 
                     userId, 
@@ -212,10 +225,10 @@ namespace PdfManagement.API.Controllers
             {
                 return BadRequest(new ApiResponse { Success = false, Message = ex.Message });
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 return StatusCode(StatusCodes.Status500InternalServerError, 
-                    new ApiResponse { Success = false, Message = "An error occurred while sharing the document" });
+                    new ApiResponse { Success = false, Message = $"An error occurred while sharing the document: {ex.Message}" });
             }
         }
         
@@ -253,16 +266,24 @@ namespace PdfManagement.API.Controllers
                 {
                     new Claim("documentId", id.ToString()),
                     new Claim("tokenId", token.Token.ToString()),
-                    new Claim("exp", new DateTimeOffset(token.ExpiresAt).ToUnixTimeSeconds().ToString())
+                    new Claim(JwtRegisteredClaimNames.Exp, new DateTimeOffset(token.ExpiresAt).ToUnixTimeSeconds().ToString())
                 };
                 
-                var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(
-                    Environment.GetEnvironmentVariable("JWT_KEY") ?? "your_default_jwt_key_for_pdf_sharing_12345"));
+                // Get JWT key from environment variable
+                var jwtKey = Environment.GetEnvironmentVariable("JWT_KEY");
+                if (string.IsNullOrEmpty(jwtKey))
+                {
+                    // Fallback to a default key (not recommended for production)
+                    jwtKey = "ThisIsMySecretKeyForPdfManagementApplication12345ThisIsALongerKeyToMeetRequirements";
+                    Console.WriteLine("WARNING: Using default JWT key. Set JWT_KEY environment variable for security.");
+                }
+                
+                var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
                 var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
                 
                 var jwtToken = new JwtSecurityToken(
-                    issuer: "pdf-management-api",
-                    audience: "pdf-management-client",
+                    issuer: Environment.GetEnvironmentVariable("JWT_ISSUER") ?? "PdfManagement.API",
+                    audience: Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? "PdfManagementClient",
                     claims: claims,
                     expires: token.ExpiresAt,
                     signingCredentials: creds);

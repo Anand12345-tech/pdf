@@ -4,6 +4,7 @@ using PdfManagement.Core.Domain.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
 
 namespace PdfManagement.Core.Application.Services
 {
@@ -77,18 +78,17 @@ namespace PdfManagement.Core.Application.Services
                 CommenterName = commenterName
             };
 
-            await _unitOfWork.BeginTransactionAsync();
-            try
+            // Use the execution strategy properly
+            var strategy = _unitOfWork.Context.Database.CreateExecutionStrategy();
+            
+            await strategy.ExecuteAsync(async () => 
             {
-                var result = await _commentRepository.AddAsync(comment);
-                await _unitOfWork.CommitTransactionAsync();
-                return result;
-            }
-            catch
-            {
-                await _unitOfWork.RollbackTransactionAsync();
-                throw;
-            }
+                // Add comment directly without manual transaction management
+                await _commentRepository.AddAsync(comment);
+                await _unitOfWork.SaveChangesAsync();
+            });
+
+            return comment;
         }
 
         /// <inheritdoc/>
@@ -124,18 +124,18 @@ namespace PdfManagement.Core.Application.Services
                 }
             }
             
-            await _unitOfWork.BeginTransactionAsync();
-            try
+            // Use the execution strategy properly
+            var strategy = _unitOfWork.Context.Database.CreateExecutionStrategy();
+            bool result = false;
+            
+            await strategy.ExecuteAsync(async () => 
             {
-                var result = await _commentRepository.DeleteWithRepliesAsync(commentId);
-                await _unitOfWork.CommitTransactionAsync();
-                return result;
-            }
-            catch
-            {
-                await _unitOfWork.RollbackTransactionAsync();
-                return false;
-            }
+                // Delete comment directly without manual transaction management
+                result = await _commentRepository.DeleteWithRepliesAsync(commentId);
+                await _unitOfWork.SaveChangesAsync();
+            });
+            
+            return result;
         }
 
         /// <inheritdoc/>
@@ -151,7 +151,17 @@ namespace PdfManagement.Core.Application.Services
             comment.Content = content;
             comment.UpdatedAt = DateTime.UtcNow;
             
-            var success = await _commentRepository.UpdateAsync(comment);
+            // Use the execution strategy properly
+            var strategy = _unitOfWork.Context.Database.CreateExecutionStrategy();
+            bool success = false;
+            
+            await strategy.ExecuteAsync(async () => 
+            {
+                // Update comment directly without manual transaction management
+                success = await _commentRepository.UpdateAsync(comment);
+                await _unitOfWork.SaveChangesAsync();
+            });
+            
             return success ? comment : null;
         }
     }
