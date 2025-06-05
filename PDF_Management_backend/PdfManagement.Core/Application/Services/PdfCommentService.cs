@@ -1,12 +1,13 @@
 using PdfManagement.Core.Application.Interfaces;
 using PdfManagement.Core.Domain.Entities;
 using PdfManagement.Core.Domain.Interfaces;
+using PdfManagement.Data.Repositories.Interfaces;
+using PdfManagement.Services.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Microsoft.EntityFrameworkCore;
 
-namespace PdfManagement.Core.Application.Services
+namespace PdfManagement.Services.Implementations
 {
     /// <summary>
     /// Implementation of the PDF comment service
@@ -15,27 +16,24 @@ namespace PdfManagement.Core.Application.Services
     {
         private readonly IPdfCommentRepository _commentRepository;
         private readonly IPdfDocumentRepository _documentRepository;
-        private readonly IUnitOfWork _unitOfWork;
 
         public PdfCommentService(
             IPdfCommentRepository commentRepository,
-            IPdfDocumentRepository documentRepository,
-            IUnitOfWork unitOfWork)
+            IPdfDocumentRepository documentRepository)
         {
             _commentRepository = commentRepository;
             _documentRepository = documentRepository;
-            _unitOfWork = unitOfWork;
         }
 
         /// <inheritdoc/>
         public async Task<PdfComment> AddCommentAsync(
-            int pdfId, 
-            string content, 
-            int pageNumber, 
-            string? userId = null, 
-            string userType = "user", 
+            int pdfId,
+            string content,
+            int pageNumber,
+            string userId = null,
+            string userType = "user",
             int? parentCommentId = null,
-            string? commenterName = null)
+            string commenterName = null)
         {
             // Validate document exists
             var document = await _documentRepository.GetByIdAsync(pdfId);
@@ -52,13 +50,13 @@ namespace PdfManagement.Core.Application.Services
                 {
                     throw new ArgumentException("Parent comment not found.");
                 }
-                
+
                 // Ensure parent comment belongs to the same document
                 if (parentComment.DocumentId != pdfId)
                 {
                     throw new ArgumentException("Parent comment does not belong to the specified document.");
                 }
-                
+
                 // Prevent nested replies (only one level of nesting allowed)
                 if (parentComment.ParentCommentId.HasValue)
                 {
@@ -78,17 +76,7 @@ namespace PdfManagement.Core.Application.Services
                 CommenterName = commenterName
             };
 
-            // Use the execution strategy properly
-            var strategy = _unitOfWork.Context.Database.CreateExecutionStrategy();
-            
-            await strategy.ExecuteAsync(async () => 
-            {
-                // Add comment directly without manual transaction management
-                await _commentRepository.AddAsync(comment);
-                await _unitOfWork.SaveChangesAsync();
-            });
-
-            return comment;
+            return await _commentRepository.AddAsync(comment);
         }
 
         /// <inheritdoc/>
@@ -107,12 +95,12 @@ namespace PdfManagement.Core.Application.Services
         public async Task<bool> DeleteCommentAsync(int commentId, string userId)
         {
             var comment = await _commentRepository.GetByIdAsync(commentId);
-            
+
             if (comment == null)
             {
                 return false;
             }
-            
+
             // Check if user has permission to delete
             if (comment.CommenterId != userId)
             {
@@ -123,45 +111,24 @@ namespace PdfManagement.Core.Application.Services
                     return false;
                 }
             }
-            
-            // Use the execution strategy properly
-            var strategy = _unitOfWork.Context.Database.CreateExecutionStrategy();
-            bool result = false;
-            
-            await strategy.ExecuteAsync(async () => 
-            {
-                // Delete comment directly without manual transaction management
-                result = await _commentRepository.DeleteWithRepliesAsync(commentId);
-                await _unitOfWork.SaveChangesAsync();
-            });
-            
-            return result;
+
+            return await _commentRepository.DeleteAsync(commentId);
         }
 
         /// <inheritdoc/>
-        public async Task<PdfComment?> UpdateCommentAsync(int commentId, string content, string userId)
+        public async Task<PdfComment> UpdateCommentAsync(int commentId, string content, string userId)
         {
             var comment = await _commentRepository.GetByIdAsync(commentId);
-            
+
             if (comment == null || comment.CommenterId != userId)
             {
                 return null;
             }
-            
+
             comment.Content = content;
             comment.UpdatedAt = DateTime.UtcNow;
-            
-            // Use the execution strategy properly
-            var strategy = _unitOfWork.Context.Database.CreateExecutionStrategy();
-            bool success = false;
-            
-            await strategy.ExecuteAsync(async () => 
-            {
-                // Update comment directly without manual transaction management
-                success = await _commentRepository.UpdateAsync(comment);
-                await _unitOfWork.SaveChangesAsync();
-            });
-            
+
+            var success = await _commentRepository.UpdateAsync(comment);
             return success ? comment : null;
         }
     }

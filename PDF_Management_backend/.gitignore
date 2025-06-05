@@ -1,5 +1,49 @@
-# Environment variables
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio files
+.vs/
+*.user
+*.userosscache
+*.suo
+*.userprefs
+*.dbmdl
+*.dbproj.schemaview
+*.jfm
+*.pfx
+*.publishsettings
+
+# Environment files
 .env
 .env.local
-.env.development
-.env.production
+.env.development.local
+.env.test.local
+.env.production.local
+appsettings.Development.json
+appsettings.Production.json
+
+# Uploaded files
+Storage/Uploads/*
+!Storage/Uploads/.gitkeep
+
+# Dependency directories
+node_modules/
+
+# Misc
+.DS_Store
+Thumbs.db
+
+/pdf_service.txt

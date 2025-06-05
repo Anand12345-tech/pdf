@@ -6,6 +6,7 @@ using PdfManagement.API.Models.Common;
 using PdfManagement.API.Models.Documents;
 using PdfManagement.Core.Application.Interfaces;
 using PdfManagement.Core.Domain.Entities;
+using PdfManagement.Services.Interfaces;
 using Swashbuckle.AspNetCore.Annotations;
 using System;
 using System.Collections.Generic;
@@ -24,29 +25,20 @@ namespace PdfManagement.API.Controllers
         private readonly IPdfDocumentService _pdfDocumentService;
         private readonly IFileStorageService _fileStorageService;
 
-        public PdfDocumentsController(
-            IPdfDocumentService pdfDocumentService,
-            IFileStorageService fileStorageService)
+        public PdfDocumentsController(IPdfDocumentService pdfDocumentService,IFileStorageService fileStorageService)
         {
             _pdfDocumentService = pdfDocumentService;
             _fileStorageService = fileStorageService;
         }
 
         [HttpGet]
-       // [Authorize]
-        [SwaggerOperation(
-            Summary = "Get all documents for the current user",
-            Description = "Returns a list of all PDF documents uploaded by the authenticated user",
-            OperationId = "GetUserDocuments",
-            Tags = new[] { "Documents" }
-        )]
         [SwaggerResponse(StatusCodes.Status200OK, "List of user documents", typeof(IEnumerable<DocumentViewModel>))]
         [SwaggerResponse(StatusCodes.Status401Unauthorized, "User is not authenticated")]
         public async Task<ActionResult<IEnumerable<DocumentViewModel>>> GetUserDocuments()
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "demo-user";
             var documents = await _pdfDocumentService.GetUserPdfsAsync(userId);
-            
+
             var result = new List<DocumentViewModel>();
             foreach (var doc in documents)
             {
@@ -60,18 +52,11 @@ namespace PdfManagement.API.Controllers
                     ViewUrl = Url.ActionLink("ViewDocument", "PdfDocuments", new { id = doc.Id }) ?? string.Empty
                 });
             }
-            
+
             return Ok(result);
         }
 
         [HttpGet("{id}")]
-        //[Authorize]
-        [SwaggerOperation(
-            Summary = "Get a specific document",
-            Description = "Returns details of a specific PDF document by ID",
-            OperationId = "GetDocument",
-            Tags = new[] { "Documents" }
-        )]
         [SwaggerResponse(StatusCodes.Status200OK, "Document details", typeof(DocumentViewModel))]
         [SwaggerResponse(StatusCodes.Status404NotFound, "Document not found")]
         [SwaggerResponse(StatusCodes.Status401Unauthorized, "User is not authenticated")]
@@ -99,13 +84,6 @@ namespace PdfManagement.API.Controllers
         }
 
         [HttpPost]
-        //[Authorize]
-        [SwaggerOperation(
-            Summary = "Upload a new PDF document",
-            Description = "Uploads a new PDF document to the system",
-            OperationId = "UploadDocument",
-            Tags = new[] { "Documents" }
-        )]
         [SwaggerResponse(StatusCodes.Status201Created, "Document uploaded successfully", typeof(DocumentViewModel))]
         [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid file or file type")]
         [SwaggerResponse(StatusCodes.Status401Unauthorized, "User is not authenticated")]
@@ -126,7 +104,7 @@ namespace PdfManagement.API.Controllers
             {
                 var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "demo-user";
                 var document = await _pdfDocumentService.UploadPdfAsync(file, userId);
-                
+
                 var result = new DocumentViewModel
                 {
                     Id = document.Id,
@@ -135,24 +113,17 @@ namespace PdfManagement.API.Controllers
                     UploadedAt = document.UploadedAt,
                     DownloadUrl = Url.ActionLink("DownloadDocument", "PdfDocuments", new { id = document.Id }) ?? string.Empty
                 };
-                
+
                 return CreatedAtAction(nameof(GetDocument), new { id = document.Id }, result);
             }
             catch (Exception ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, 
+                return StatusCode(StatusCodes.Status500InternalServerError,
                     new ApiResponse { Success = false, Message = ex.Message });
             }
         }
 
         [HttpDelete("{id}")]
-        //[Authorize]
-        [SwaggerOperation(
-            Summary = "Delete a document",
-            Description = "Deletes a PDF document by ID",
-            OperationId = "DeleteDocument",
-            Tags = new[] { "Documents" }
-        )]
         [SwaggerResponse(StatusCodes.Status204NoContent, "Document deleted successfully")]
         [SwaggerResponse(StatusCodes.Status404NotFound, "Document not found")]
         [SwaggerResponse(StatusCodes.Status401Unauthorized, "User is not authenticated")]
@@ -170,13 +141,6 @@ namespace PdfManagement.API.Controllers
         }
 
         [HttpPost("{id}/share")]
-        //[Authorize]
-        [SwaggerOperation(
-            Summary = "Share a document",
-            Description = "Generates a shareable link for a PDF document",
-            OperationId = "ShareDocument",
-            Tags = new[] { "Documents" }
-        )]
         [SwaggerResponse(StatusCodes.Status200OK, "Share link generated", typeof(ShareDocumentResponse))]
         [SwaggerResponse(StatusCodes.Status404NotFound, "Document not found")]
         [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid request")]
@@ -185,7 +149,7 @@ namespace PdfManagement.API.Controllers
         public async Task<ActionResult<ShareDocumentResponse>> ShareDocument(int id, [FromBody] ShareDocumentModel model)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "demo-user";
-            
+
             try
             {
                 // First check if the document exists and belongs to the user
@@ -194,31 +158,31 @@ namespace PdfManagement.API.Controllers
                 {
                     return NotFound(new ApiResponse { Success = false, Message = "Document not found" });
                 }
-                
+
                 // If model.ExpiresAt is null, set a default value
                 if (model.ExpiresAt == null)
                 {
                     model.ExpiresAt = DateTime.UtcNow.AddDays(7);
                 }
-                
+
                 var token = await _pdfDocumentService.GenerateAccessTokenAsync(
-                    id, 
-                    userId, 
+                    id,
+                    userId,
                     model.ExpiresAt);
-                
+
                 // Generate a frontend URL instead of an API endpoint URL
                 var request = HttpContext.Request;
                 // Replace API port (5000) with frontend port (3000)
                 var host = request.Host.Value.Replace("5000", "3000");
                 var baseUrl = $"{request.Scheme}://{host}";
-                
+
                 var response = new ShareDocumentResponse
                 {
                     Token = token.Token,
                     ExpiresAt = token.ExpiresAt,
                     Url = $"{baseUrl}/shared-pdf/{token.Token}"
                 };
-                
+
                 return Ok(response);
             }
             catch (ArgumentException ex)
@@ -227,19 +191,12 @@ namespace PdfManagement.API.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, 
+                return StatusCode(StatusCodes.Status500InternalServerError,
                     new ApiResponse { Success = false, Message = $"An error occurred while sharing the document: {ex.Message}" });
             }
         }
-        
+
         [HttpPost("{id}/share-jwt")]
-        //[Authorize]
-        [SwaggerOperation(
-            Summary = "Share a document with JWT",
-            Description = "Generates a JWT token for sharing a PDF document",
-            OperationId = "ShareDocumentJwt",
-            Tags = new[] { "Documents" }
-        )]
         [SwaggerResponse(StatusCodes.Status200OK, "JWT token generated", typeof(JwtShareResponse))]
         [SwaggerResponse(StatusCodes.Status404NotFound, "Document not found")]
         [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid request")]
@@ -248,7 +205,7 @@ namespace PdfManagement.API.Controllers
         public async Task<ActionResult<JwtShareResponse>> ShareDocumentJwt(int id, [FromBody] ShareDocumentModel model)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "demo-user";
-            
+
             try
             {
                 // First check if the document exists and belongs to the user
@@ -257,10 +214,10 @@ namespace PdfManagement.API.Controllers
                 {
                     return NotFound(new ApiResponse { Success = false, Message = "Document not found" });
                 }
-                
+
                 // Generate a JWT token for the document
                 var token = await _pdfDocumentService.GenerateAccessTokenAsync(id, userId, model.ExpiresAt);
-                
+
                 // Create a JWT token with document information
                 var claims = new List<Claim>
                 {
@@ -268,7 +225,7 @@ namespace PdfManagement.API.Controllers
                     new Claim("tokenId", token.Token.ToString()),
                     new Claim(JwtRegisteredClaimNames.Exp, new DateTimeOffset(token.ExpiresAt).ToUnixTimeSeconds().ToString())
                 };
-                
+
                 // Get JWT key from environment variable
                 var jwtKey = Environment.GetEnvironmentVariable("JWT_KEY");
                 if (string.IsNullOrEmpty(jwtKey))
@@ -277,19 +234,19 @@ namespace PdfManagement.API.Controllers
                     jwtKey = "ThisIsMySecretKeyForPdfManagementApplication12345ThisIsALongerKeyToMeetRequirements";
                     Console.WriteLine("WARNING: Using default JWT key. Set JWT_KEY environment variable for security.");
                 }
-                
+
                 var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
                 var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-                
+
                 var jwtToken = new JwtSecurityToken(
                     issuer: Environment.GetEnvironmentVariable("JWT_ISSUER") ?? "PdfManagement.API",
                     audience: Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? "PdfManagementClient",
                     claims: claims,
                     expires: token.ExpiresAt,
                     signingCredentials: creds);
-                
+
                 var tokenString = new JwtSecurityTokenHandler().WriteToken(jwtToken);
-                
+
                 // Create the response with the JWT token and share URL
                 // Ensure we create an absolute URL that will work when pasted in any browser
                 var request = HttpContext.Request;
@@ -297,14 +254,14 @@ namespace PdfManagement.API.Controllers
                 var host = request.Host.Value.Replace("5000", "3000");
                 var baseUrl = $"{request.Scheme}://{host}";
                 var shareUrl = $"{baseUrl}/shared-pdf/{tokenString}";
-                
+
                 var response = new JwtShareResponse
                 {
                     Token = tokenString,
                     ExpiresAt = token.ExpiresAt,
                     ShareUrl = shareUrl
                 };
-                
+
                 return Ok(response);
             }
             catch (ArgumentException ex)
@@ -313,19 +270,12 @@ namespace PdfManagement.API.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, 
+                return StatusCode(StatusCodes.Status500InternalServerError,
                     new ApiResponse { Success = false, Message = $"An error occurred while sharing the document: {ex.Message}" });
             }
         }
 
         [HttpGet("download/{id}")]
-        //[Authorize]
-        [SwaggerOperation(
-            Summary = "Download a document",
-            Description = "Downloads a PDF document by ID",
-            OperationId = "DownloadDocument",
-            Tags = new[] { "Documents" }
-        )]
         [SwaggerResponse(StatusCodes.Status200OK, "File content", typeof(FileContentResult))]
         [SwaggerResponse(StatusCodes.Status404NotFound, "Document not found")]
         [SwaggerResponse(StatusCodes.Status401Unauthorized, "User is not authenticated")]
@@ -343,12 +293,12 @@ namespace PdfManagement.API.Controllers
                 }
 
                 var fileBytes = await _fileStorageService.GetFileAsync(document.FilePath);
-                
+
                 // Set CORS headers to allow download from any origin
                 Response.Headers.Add("Access-Control-Allow-Origin", "*");
                 Response.Headers.Add("Access-Control-Allow-Methods", "GET");
                 Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization");
-                
+
                 return File(fileBytes, document.ContentType, document.FileName);
             }
             catch (FileNotFoundException)
@@ -357,13 +307,13 @@ namespace PdfManagement.API.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, 
+                return StatusCode(StatusCodes.Status500InternalServerError,
                     new ApiResponse { Success = false, Message = $"An error occurred while downloading the file: {ex.Message}" });
             }
         }
         [HttpGet("view/{id}")]
         //[Authorize]
-                [SwaggerOperation(
+        [SwaggerOperation(
             Summary = "View a document",
             Description = "Returns a PDF document for viewing in the browser",
             OperationId = "ViewDocument",
@@ -384,7 +334,7 @@ namespace PdfManagement.API.Controllers
             try
             {
                 var fileBytes = await _fileStorageService.GetFileAsync(document.FilePath);
-             
+
                 return File(fileBytes, "application/pdf", document.FileName, false);
             }
             catch (FileNotFoundException)

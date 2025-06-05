@@ -1,11 +1,13 @@
 using PdfManagement.Core.Application.Interfaces;
 using PdfManagement.Core.Domain.Entities;
 using PdfManagement.Core.Domain.Interfaces;
+using PdfManagement.Data.Repositories.Interfaces;
+using PdfManagement.Services.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace PdfManagement.Core.Application.Services
+namespace PdfManagement.Services.Implementations
 {
     /// <summary>
     /// Implementation of the public access service
@@ -27,10 +29,10 @@ namespace PdfManagement.Core.Application.Services
         }
 
         /// <inheritdoc/>
-        public async Task<PdfDocument?> GetDocumentByTokenAsync(Guid token, string? ipAddress = null, string? userAgent = null)
+        public async Task<PdfDocument> GetDocumentByTokenAsync(Guid token, string ipAddress = null, string userAgent = null)
         {
             var document = await _documentRepository.GetByTokenAsync(token);
-            
+
             if (document != null)
             {
                 // Log the access
@@ -42,38 +44,38 @@ namespace PdfManagement.Core.Application.Services
                     UserAgent = userAgent
                 });
             }
-            
+
             return document;
         }
 
         /// <inheritdoc/>
-        public async Task<IEnumerable<PdfComment>?> GetCommentsForTokenAsync(Guid token)
+        public async Task<IEnumerable<PdfComment>> GetCommentsForTokenAsync(Guid token)
         {
             var document = await _documentRepository.GetByTokenAsync(token);
-            
+
             if (document == null)
             {
                 return null;
             }
-            
+
             return await _commentRepository.GetByPdfIdAsync(document.Id);
         }
 
         /// <inheritdoc/>
-        public async Task<PdfComment?> AddCommentToTokenDocumentAsync(
-            Guid token, 
-            string content, 
-            int pageNumber, 
+        public async Task<PdfComment> AddCommentToTokenDocumentAsync(
+            Guid token,
+            string content,
+            int pageNumber,
             int? parentCommentId = null,
-            string? commenterName = null)
+            string commenterName = null)
         {
             var document = await _documentRepository.GetByTokenAsync(token);
-            
+
             if (document == null)
             {
                 return null;
             }
-            
+
             try
             {
                 return await _commentService.AddCommentAsync(

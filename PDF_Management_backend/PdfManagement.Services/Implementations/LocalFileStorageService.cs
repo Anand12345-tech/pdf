@@ -13,13 +13,17 @@ namespace PdfManagement.Services.Implementations
 
         public LocalFileStorageService(IConfiguration configuration)
         {
+            // Use the uploads folder in the project directory
             _storageBasePath = configuration["FileStorage:LocalBasePath"] ?? 
-                Path.Combine(Directory.GetCurrentDirectory(), "FileStorage");
+                Path.Combine(Directory.GetCurrentDirectory(), "uploads");
+            
+            Console.WriteLine($"File storage path: {_storageBasePath}");
             
             // Ensure the storage directory exists
             if (!Directory.Exists(_storageBasePath))
             {
                 Directory.CreateDirectory(_storageBasePath);
+                Console.WriteLine($"Created directory: {_storageBasePath}");
             }
         }
 
@@ -30,11 +34,14 @@ namespace PdfManagement.Services.Implementations
             if (!Directory.Exists(userDirectory))
             {
                 Directory.CreateDirectory(userDirectory);
+                Console.WriteLine($"Created user directory: {userDirectory}");
             }
 
             // Generate a unique filename
             var fileName = $"{Guid.NewGuid()}_{Path.GetFileName(file.FileName)}";
             var filePath = Path.Combine(userDirectory, fileName);
+
+            Console.WriteLine($"Saving file to: {filePath}");
 
             // Save the file
             using (var stream = new FileStream(filePath, FileMode.Create))
@@ -50,8 +57,11 @@ namespace PdfManagement.Services.Implementations
         {
             var fullPath = Path.Combine(_storageBasePath, filePath);
             
+            Console.WriteLine($"Getting file from: {fullPath}");
+            
             if (!File.Exists(fullPath))
             {
+                Console.WriteLine($"File not found: {fullPath}");
                 throw new FileNotFoundException("The requested file was not found.", fullPath);
             }
 
@@ -62,19 +72,25 @@ namespace PdfManagement.Services.Implementations
         {
             var fullPath = Path.Combine(_storageBasePath, filePath);
             
+            Console.WriteLine($"Deleting file: {fullPath}");
+            
             if (!File.Exists(fullPath))
             {
+                Console.WriteLine($"File not found for deletion: {fullPath}");
                 return Task.FromResult(false);
             }
 
             File.Delete(fullPath);
+            Console.WriteLine($"File deleted: {fullPath}");
             return Task.FromResult(true);
         }
 
         public Task<bool> FileExistsAsync(string filePath)
         {
             var fullPath = Path.Combine(_storageBasePath, filePath);
-            return Task.FromResult(File.Exists(fullPath));
+            var exists = File.Exists(fullPath);
+            Console.WriteLine($"Checking if file exists: {fullPath} - {exists}");
+            return Task.FromResult(exists);
         }
     }
 }

@@ -6,6 +6,7 @@ using PdfManagement.API.Models.Comments;
 using PdfManagement.API.Models.Common;
 using PdfManagement.API.Models.Public;
 using PdfManagement.Core.Application.Interfaces;
+using PdfManagement.Services.Interfaces;
 using Swashbuckle.AspNetCore.Annotations;
 using System;
 using System.IdentityModel.Tokens.Jwt;
@@ -47,13 +48,16 @@ namespace PdfManagement.API.Controllers
         [ResponseCache(Duration = 60)] // Cache for 1 minute
         public async Task<IActionResult> View(Guid token)
         {
+            Console.WriteLine($"View request received for token: {token}");
+            
             var document = await _publicAccessService.GetDocumentByTokenAsync(
-                token, 
+                token,
                 HttpContext.Connection.RemoteIpAddress?.ToString(),
                 Request.Headers["User-Agent"].ToString());
 
             if (document == null)
             {
+                Console.WriteLine($"Document not found for token: {token}");
                 return NotFound(new ApiResponse { Success = false, Message = "Document not found or access token has expired" });
             }
 
@@ -94,7 +98,7 @@ namespace PdfManagement.API.Controllers
                     }).ToList() ?? new System.Collections.Generic.List<CommentViewModel>()
                 }).ToList() ?? new System.Collections.Generic.List<CommentViewModel>()
             }).ToList() ?? new System.Collections.Generic.List<CommentViewModel>();
-            
+
             var response = new PublicDocumentViewModel
             {
                 Document = new DocumentInfo
@@ -106,7 +110,8 @@ namespace PdfManagement.API.Controllers
                 Comments = commentViewModels,
                 DownloadUrl = Url.ActionLink("Download", "Public", new { token = token }) ?? string.Empty
             };
-            
+
+            Console.WriteLine($"Returning document info: {document.FileName}, ID: {document.Id}");
             return Ok(response);
         }
 
@@ -122,13 +127,15 @@ namespace PdfManagement.API.Controllers
         [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid token")]
         public async Task<IActionResult> ViewWithJwt(string token)
         {
+            Console.WriteLine($"JWT view request received for token: {token.Substring(0, Math.Min(token.Length, 20))}...");
+            
             try
             {
                 // Validate and decode the JWT token
                 var tokenHandler = new JwtSecurityTokenHandler();
                 var key = Encoding.UTF8.GetBytes(
                     Environment.GetEnvironmentVariable("JWT_KEY") ?? "your_default_jwt_key_for_pdf_sharing_12345");
-                
+
                 var validationParameters = new TokenValidationParameters
                 {
                     ValidateIssuerSigningKey = true,
@@ -140,61 +147,77 @@ namespace PdfManagement.API.Controllers
                     ValidateLifetime = true,
                     ClockSkew = TimeSpan.Zero
                 };
-                
+
                 SecurityToken validatedToken;
                 var principal = tokenHandler.ValidateToken(token, validationParameters, out validatedToken);
-                
+
                 // Extract document ID from claims
                 var documentIdClaim = principal.FindFirst("documentId");
                 if (documentIdClaim == null || !int.TryParse(documentIdClaim.Value, out int documentId))
                 {
+                    Console.WriteLine("Invalid token: missing or invalid document ID");
                     return BadRequest(new ApiResponse { Success = false, Message = "Invalid token: missing or invalid document ID" });
                 }
-                
+
                 // Extract token ID from claims
                 var tokenIdClaim = principal.FindFirst("tokenId");
                 if (tokenIdClaim == null || !Guid.TryParse(tokenIdClaim.Value, out Guid tokenId))
                 {
+                    Console.WriteLine("Invalid token: missing or invalid token ID");
                     return BadRequest(new ApiResponse { Success = false, Message = "Invalid token: missing or invalid token ID" });
                 }
-                
+
                 // Get the document using the token ID
                 var document = await _publicAccessService.GetDocumentByTokenAsync(
                     tokenId,
                     HttpContext.Connection.RemoteIpAddress?.ToString(),
                     Request.Headers["User-Agent"].ToString());
-                
+
                 if (document == null || document.Id != documentId)
                 {
+                    Console.WriteLine($"Document not found for token ID: {tokenId}, document ID: {documentId}");
                     return NotFound(new ApiResponse { Success = false, Message = "Document not found or access token has expired" });
                 }
-                
+
                 // Return the PDF file for viewing
                 try
                 {
+                    Console.WriteLine($"Fetching file from path: {document.FilePath}");
                     var fileBytes = await _fileStorageService.GetFileAsync(document.FilePath);
+                    
+                    // Set CORS headers to allow viewing from any origin
+                    Response.Headers.Add("Access-Control-Allow-Origin", "*");
+                    Response.Headers.Add("Access-Control-Allow-Methods", "GET");
+                    Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization");
+                    
+                    Console.WriteLine($"Returning file: {document.FileName}, Content-Type: {document.ContentType}, Size: {fileBytes.Length} bytes");
                     return File(fileBytes, "application/pdf", document.FileName, false);
                 }
-                catch (FileNotFoundException)
+                catch (FileNotFoundException ex)
                 {
+                    Console.WriteLine($"File not found: {ex.Message}");
                     return NotFound(new ApiResponse { Success = false, Message = "File not found" });
                 }
                 catch (Exception ex)
                 {
+                    Console.WriteLine($"Error retrieving file: {ex.Message}");
                     return StatusCode(StatusCodes.Status500InternalServerError,
                         new ApiResponse { Success = false, Message = $"An error occurred: {ex.Message}" });
                 }
             }
-            catch (SecurityTokenExpiredException)
+            catch (SecurityTokenExpiredException ex)
             {
+                Console.WriteLine($"Token expired: {ex.Message}");
                 return BadRequest(new ApiResponse { Success = false, Message = "Token has expired" });
             }
             catch (SecurityTokenException ex)
             {
+                Console.WriteLine($"Invalid token: {ex.Message}");
                 return BadRequest(new ApiResponse { Success = false, Message = $"Invalid token: {ex.Message}" });
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"Error processing JWT: {ex.Message}");
                 return StatusCode(StatusCodes.Status500InternalServerError,
                     new ApiResponse { Success = false, Message = $"An error occurred: {ex.Message}" });
             }
@@ -213,6 +236,8 @@ namespace PdfManagement.API.Controllers
         [ResponseCache(Duration = 300)] // Cache for 5 minutes
         public async Task<IActionResult> Download(Guid token)
         {
+            Console.WriteLine($"Download request received for token: {token}");
+            
             var document = await _publicAccessService.GetDocumentByTokenAsync(
                 token,
                 HttpContext.Connection.RemoteIpAddress?.ToString(),
@@ -220,25 +245,36 @@ namespace PdfManagement.API.Controllers
 
             if (document == null)
             {
+                Console.WriteLine($"Document not found for token: {token}");
                 return NotFound(new ApiResponse { Success = false, Message = "Document not found or access token has expired" });
             }
 
             try
             {
+                Console.WriteLine($"Fetching file from path: {document.FilePath}");
                 var fileBytes = await _fileStorageService.GetFileAsync(document.FilePath);
+                
+                // Set CORS headers to allow download from any origin
+                Response.Headers.Add("Access-Control-Allow-Origin", "*");
+                Response.Headers.Add("Access-Control-Allow-Methods", "GET");
+                Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization");
+                
+                Console.WriteLine($"Returning file: {document.FileName}, Content-Type: {document.ContentType}, Size: {fileBytes.Length} bytes");
                 return File(fileBytes, document.ContentType, document.FileName);
             }
-            catch (FileNotFoundException)
+            catch (FileNotFoundException ex)
             {
+                Console.WriteLine($"File not found: {ex.Message}");
                 return NotFound(new ApiResponse { Success = false, Message = "File not found" });
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, 
+                Console.WriteLine($"Error downloading file: {ex.Message}");
+                return StatusCode(StatusCodes.Status500InternalServerError,
                     new ApiResponse { Success = false, Message = "An error occurred while downloading the file" });
             }
         }
-        
+
         [HttpGet("shared/{token}")]
         [SwaggerOperation(
             Summary = "View a shared document in HTML viewer",
@@ -266,6 +302,8 @@ namespace PdfManagement.API.Controllers
         [RateLimit(Name = "PublicComment", Seconds = 60, Limit = 5)]
         public async Task<IActionResult> AddComment(Guid token, [FromBody] AddCommentRequest model)
         {
+            Console.WriteLine($"Add comment request received for token: {token}");
+            
             if (!ModelState.IsValid)
             {
                 return BadRequest(ModelState);
@@ -280,6 +318,7 @@ namespace PdfManagement.API.Controllers
 
             if (comment == null)
             {
+                Console.WriteLine($"Document not found for token: {token}");
                 return NotFound(new ApiResponse { Success = false, Message = "Document not found or access token has expired" });
             }
 
@@ -320,14 +359,16 @@ namespace PdfManagement.API.Controllers
                 Replies = new System.Collections.Generic.List<CommentViewModel>()
             };
 
-            return Ok(new { 
+            Console.WriteLine($"Comment added successfully: ID {comment.Id}");
+            return Ok(new
+            {
                 comment = newCommentViewModel,
                 allComments = updatedCommentViewModels,
-                success = true, 
-                message = comment.ParentCommentId.HasValue ? "Reply added successfully" : "Comment added successfully" 
+                success = true,
+                message = comment.ParentCommentId.HasValue ? "Reply added successfully" : "Comment added successfully"
             });
         }
-        
+
         [HttpPost("comment-jwt/{token}")]
         [SwaggerOperation(
             Summary = "Add a comment to a shared document using JWT",
@@ -341,6 +382,8 @@ namespace PdfManagement.API.Controllers
         [SwaggerResponse(StatusCodes.Status500InternalServerError, "Server error")]
         public async Task<IActionResult> AddCommentJwt(string token, [FromBody] AddCommentRequest model)
         {
+            Console.WriteLine($"Add comment JWT request received for token: {token.Substring(0, Math.Min(token.Length, 20))}...");
+            
             if (!ModelState.IsValid)
             {
                 return BadRequest(ModelState);
@@ -352,7 +395,7 @@ namespace PdfManagement.API.Controllers
                 var tokenHandler = new JwtSecurityTokenHandler();
                 var key = Encoding.UTF8.GetBytes(
                     Environment.GetEnvironmentVariable("JWT_KEY") ?? "your_default_jwt_key_for_pdf_sharing_12345");
-                
+
                 var validationParameters = new TokenValidationParameters
                 {
                     ValidateIssuerSigningKey = true,
@@ -364,17 +407,18 @@ namespace PdfManagement.API.Controllers
                     ValidateLifetime = true,
                     ClockSkew = TimeSpan.Zero
                 };
-                
+
                 SecurityToken validatedToken;
                 var principal = tokenHandler.ValidateToken(token, validationParameters, out validatedToken);
-                
+
                 // Extract token ID from claims
                 var tokenIdClaim = principal.FindFirst("tokenId");
                 if (tokenIdClaim == null || !Guid.TryParse(tokenIdClaim.Value, out Guid tokenId))
                 {
+                    Console.WriteLine("Invalid token: missing or invalid token ID");
                     return BadRequest(new ApiResponse { Success = false, Message = "Invalid token: missing or invalid token ID" });
                 }
-                
+
                 // Add comment using the token ID
                 var comment = await _publicAccessService.AddCommentToTokenDocumentAsync(
                     tokenId,
@@ -385,6 +429,7 @@ namespace PdfManagement.API.Controllers
 
                 if (comment == null)
                 {
+                    Console.WriteLine($"Document not found for token ID: {tokenId}");
                     return NotFound(new ApiResponse { Success = false, Message = "Document not found or access token has expired" });
                 }
 
@@ -425,23 +470,28 @@ namespace PdfManagement.API.Controllers
                     Replies = new System.Collections.Generic.List<CommentViewModel>()
                 };
 
-                return Ok(new { 
+                Console.WriteLine($"Comment added successfully via JWT: ID {comment.Id}");
+                return Ok(new
+                {
                     comment = newCommentViewModel,
                     allComments = updatedCommentViewModels,
-                    success = true, 
-                    message = comment.ParentCommentId.HasValue ? "Reply added successfully" : "Comment added successfully" 
+                    success = true,
+                    message = comment.ParentCommentId.HasValue ? "Reply added successfully" : "Comment added successfully"
                 });
             }
-            catch (SecurityTokenExpiredException)
+            catch (SecurityTokenExpiredException ex)
             {
+                Console.WriteLine($"Token expired: {ex.Message}");
                 return BadRequest(new ApiResponse { Success = false, Message = "Token has expired" });
             }
             catch (SecurityTokenException ex)
             {
+                Console.WriteLine($"Invalid token: {ex.Message}");
                 return BadRequest(new ApiResponse { Success = false, Message = $"Invalid token: {ex.Message}" });
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"Error adding comment via JWT: {ex.Message}");
                 return StatusCode(StatusCodes.Status500InternalServerError,
                     new ApiResponse { Success = false, Message = $"An error occurred: {ex.Message}" });
             }

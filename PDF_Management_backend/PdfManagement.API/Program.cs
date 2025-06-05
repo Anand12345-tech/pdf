@@ -13,12 +13,15 @@ using PdfManagement.Core.Domain.Entities;
 using PdfManagement.Core.Domain.Interfaces;
 using PdfManagement.Infrastructure.Data.Context;
 using PdfManagement.Infrastructure.Data.Repositories;
-using PdfManagement.Infrastructure.Services;
-using Microsoft.EntityFrameworkCore;
 using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using PdfManagement.Data.Repositories.Implementations;
+using PdfManagement.Data.Repositories.Interfaces;
+using PdfManagement.Services.Implementations;
+using PdfManagement.Services.Interfaces;
+using PdfManagement.Infrastructure.Services;
 
 // Load environment variables from .env file
 var envFilePath = Path.Combine(Directory.GetCurrentDirectory(), ".env");
@@ -28,13 +31,13 @@ if (File.Exists(envFilePath))
     {
         if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#"))
             continue;
-            
+
         var parts = line.Split('=', 2);
         if (parts.Length == 2)
         {
             var key = parts[0].Trim();
             var value = parts[1].Trim();
-            
+
             // Don't override existing environment variables
             if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(key)))
             {
@@ -54,13 +57,13 @@ else
         {
             if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#"))
                 continue;
-                
+
             var parts = line.Split('=', 2);
             if (parts.Length == 2)
             {
                 var key = parts[0].Trim();
                 var value = parts[1].Trim();
-                
+
                 // Don't override existing environment variables
                 if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(key)))
                 {
@@ -81,8 +84,8 @@ builder.Services.AddControllers();
 // Configure Kestrel to listen on all addresses
 builder.WebHost.ConfigureKestrel(serverOptions =>
 {
-    serverOptions.ListenAnyIP(5002); // Listen on port 5002 for HTTP
-    serverOptions.ListenAnyIP(5003, listenOptions => // Listen on port 5003 for HTTPS
+    serverOptions.ListenAnyIP(5000); // Listen on port 5000 for HTTP
+    serverOptions.ListenAnyIP(5001, listenOptions => // Listen on port 5001 for HTTPS
     {
         listenOptions.UseHttps();
     });
@@ -93,7 +96,7 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
 //    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // Get connection string from environment variable or configuration
-var connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING") ?? 
+var connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING") ??
                       builder.Configuration.GetConnectionString("DefaultConnection");
 
 // Add logging to debug connection issues
@@ -115,13 +118,13 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 static string MaskConnectionString(string connectionString)
 {
     if (string.IsNullOrEmpty(connectionString)) return string.Empty;
-    
+
     try
     {
         // Simple approach to mask password
-        return Regex.Replace(connectionString, 
-            @"Password=([^;]*)", 
-            "Password=***", 
+        return Regex.Replace(connectionString,
+            @"Password=([^;]*)",
+            "Password=***",
             RegexOptions.IgnoreCase);
     }
     catch
@@ -148,11 +151,11 @@ builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowedOrigins",
-        policy => 
+        policy =>
         {
             var allowedOriginsEnv = Environment.GetEnvironmentVariable("ALLOWED_ORIGINS");
             string[] allowedOrigins;
-            
+
             if (!string.IsNullOrEmpty(allowedOriginsEnv))
             {
                 allowedOrigins = allowedOriginsEnv.Split(',')
@@ -163,7 +166,7 @@ builder.Services.AddCors(options =>
             {
                 allowedOrigins = new[] { "http://localhost:3000" };
             }
-            
+
             if (allowedOrigins.Length > 0)
             {
                 policy.WithOrigins(allowedOrigins)
@@ -206,8 +209,8 @@ builder.Services.AddAuthentication(options =>
         ValidAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? builder.Configuration["Jwt:Audience"],
         IssuerSigningKey = new SymmetricSecurityKey(
             Encoding.UTF8.GetBytes(
-                Environment.GetEnvironmentVariable("JWT_KEY") ?? 
-                builder.Configuration["Jwt:Key"] ?? 
+                Environment.GetEnvironmentVariable("JWT_KEY") ??
+                builder.Configuration["Jwt:Key"] ??
                 string.Empty
             )
         )
@@ -218,14 +221,18 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddHealthChecks()
     .AddCheck<DbContextHealthCheck<ApplicationDbContext>>("database")
     .AddCheck("storage", () => {
-        try {
-            var storagePath = Environment.GetEnvironmentVariable("STORAGE_PATH") ?? 
+        try
+        {
+            var storagePath = Environment.GetEnvironmentVariable("STORAGE_PATH") ??
                              builder.Configuration["Storage:BasePath"];
-            if (string.IsNullOrEmpty(storagePath) || !Directory.Exists(storagePath)) {
+            if (string.IsNullOrEmpty(storagePath) || !Directory.Exists(storagePath))
+            {
                 return Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Unhealthy("Storage path is not configured or does not exist");
             }
             return Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy();
-        } catch (Exception ex) {
+        }
+        catch (Exception ex)
+        {
             return Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Unhealthy(ex.Message);
         }
     });
@@ -235,7 +242,7 @@ builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "PDF Management API", Version = "v1" });
     c.EnableAnnotations();
-    
+
     // Add JWT authentication to Swagger
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
@@ -266,61 +273,18 @@ var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 // Always enable Swagger for this application
-//app.UseSwagger();
-//app.UseSwaggerUI(c =>
-//{
-//    c.SwaggerEndpoint("/swagger/v1/swagger.json", "PDF Management API v1");
-//    c.RoutePrefix = string.Empty; // Set Swagger UI at the root
-//});
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
-    
-    // Disable HTTPS redirection in development
-    // app.UseHttpsRedirection();
-}
-else
-{
-    // Only use HTTPS redirection in production
-    app.UseHttpsRedirection();
-    
-    // Add global exception handler for production
-    app.UseExceptionHandler(errorApp =>
-    {
-        errorApp.Run(async context =>
-        {
-            context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
-            context.Response.ContentType = "application/json";
-            
-            var exceptionHandlerPathFeature = context.Features.Get<IExceptionHandlerPathFeature>();
-            var exception = exceptionHandlerPathFeature?.Error;
-            
-            var response = new ApiResponse
-            {
-                Success = false,
-                Message = "An unexpected error occurred. Please try again later."
-            };
-            
-            // Log the actual exception details (but don't send to client)
-            Console.Error.WriteLine($"Unhandled exception: {exception}");
-            
-            var jsonResponse = JsonSerializer.Serialize(response);
-            await context.Response.WriteAsync(jsonResponse);
-        });
-    });
-}
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "PDF Management API v1");
+    // c.RoutePrefix = string.Empty; // Set Swagger UI at the root
+});
 
 // Apply CORS before routing
 app.UseCors("AllowedOrigins");
 
 // Serve static files from wwwroot
 app.UseStaticFiles();
-//app.UseCors(builder => builder
-//    .AllowAnyOrigin()
-//    .AllowAnyMethod()
-//    .AllowAnyHeader());
 
 // Configure static files for images
 app.UseStaticFiles();
@@ -336,7 +300,7 @@ app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.Health
     ResponseWriter = async (context, report) =>
     {
         context.Response.ContentType = "application/json";
-        
+
         var response = new
         {
             status = report.Status.ToString(),
@@ -349,7 +313,7 @@ app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.Health
             }),
             totalDuration = report.TotalDuration.TotalMilliseconds
         };
-        
+
         await context.Response.WriteAsync(JsonSerializer.Serialize(response));
     }
 });

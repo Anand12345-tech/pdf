@@ -19,12 +19,6 @@ namespace PdfManagement.API.Controllers
         }
 
         [HttpPost("register")]
-        //[SwaggerOperation(
-        //    Summary = "Register a new user",
-        //    Description = "Creates a new user account with the provided details",
-        //    OperationId = "RegisterUser",
-        //    Tags = new[] { "Authentication" }
-        //)]
         [SwaggerResponse(StatusCodes.Status200OK, "User registered successfully", typeof(ApiResponse))]
         [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid input or validation errors", typeof(ValidationProblemDetails))]
         public async Task<IActionResult> Register([FromBody] RegisterModel model)
@@ -49,12 +43,6 @@ namespace PdfManagement.API.Controllers
         }
 
         [HttpPost("login")]
-        //[SwaggerOperation(
-        //    Summary = "Authenticate a user",
-        //    Description = "Validates user credentials and returns a JWT token",
-        //    OperationId = "LoginUser",
-        //    Tags = new[] { "Authentication" }
-       // )]
         [SwaggerResponse(StatusCodes.Status200OK, "Login successful", typeof(ApiResponse<TokenResponse>))]
         [SwaggerResponse(StatusCodes.Status401Unauthorized, "Invalid credentials")]
         [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid input", typeof(ValidationProblemDetails))]

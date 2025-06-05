@@ -231,12 +231,18 @@ export const shareDocumentJwt = async (id, expiresAt) => {
 
 export const viewSharedDocumentJwt = async (token) => {
   try {
+    console.log('Fetching document with JWT token:', token);
     const response = await axios.get(`/api/Public/view-jwt/${token}`, {
       responseType: 'blob'
     });
+    console.log('JWT document response received:', response.status);
     return URL.createObjectURL(response.data);
   } catch (error) {
     console.error(`Error viewing shared document with JWT:`, error);
+    if (error.response) {
+      console.error('Response status:', error.response.status);
+      console.error('Response headers:', error.response.headers);
+    }
     throw error;
   }
 };
@@ -249,6 +255,9 @@ export const addPublicComment = async (token, content, pageNumber, parentComment
     const endpoint = isUuid 
       ? `/api/Public/comment/${token}`
       : `/api/Public/comment-jwt/${token}`;
+    
+    console.log('Adding public comment to endpoint:', endpoint);
+    console.log('Comment data:', { content, pageNumber, parentCommentId, commenterName });
       
     const response = await axios.post(endpoint, {
       content,
@@ -256,6 +265,8 @@ export const addPublicComment = async (token, content, pageNumber, parentComment
       parentCommentId,
       commenterName
     });
+    
+    console.log('Comment response:', response.status, response.data);
     
     // Store the commenter name for this comment ID in localStorage
     if (response.data && response.data.comment && response.data.comment.id && commenterName) {
@@ -277,6 +288,10 @@ export const addPublicComment = async (token, content, pageNumber, parentComment
     return response.data;
   } catch (error) {
     console.error('Error adding public comment:', error);
+    if (error.response) {
+      console.error('Response status:', error.response.status);
+      console.error('Response data:', error.response.data);
+    }
     throw error;
   }
 };

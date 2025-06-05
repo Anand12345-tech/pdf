@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5000:80"
+      - "5001:443"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - DB_CONNECTION_STRING=${DB_CONNECTION_STRING}
+      - JWT_KEY=${JWT_KEY}
+      - JWT_ISSUER=${JWT_ISSUER}
+      - JWT_AUDIENCE=${JWT_AUDIENCE}
+      - JWT_EXPIRE_DAYS=${JWT_EXPIRE_DAYS}
+      - FILE_STORAGE_PROVIDER=${FILE_STORAGE_PROVIDER}
+      - CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME}
+      - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}
+      - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}
+      - CLOUDINARY_FOLDER=${CLOUDINARY_FOLDER}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
+    volumes:
+      - ./Storage:/app/Storage
+    restart: always
+    depends_on:
+      - db
+
+  db:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-your_production_password}
+      - POSTGRES_DB=${POSTGRES_DB:-pdf_management}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: always
+
+volumes:
+  postgres_data:

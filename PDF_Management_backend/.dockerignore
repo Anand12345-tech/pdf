@@ -1,0 +1,53 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+build/
+bld/
+[Bb]in/
+[Oo]bj/
+msbuild.log
+msbuild.err
+msbuild.wrn
+
+# Visual Studio
+.vs/
+.vscode/
+*.user
+*.userosscache
+*.suo
+*.userprefs
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Local storage
+Storage/Uploads/*
+!Storage/Uploads/.gitkeep
+
+# Logs
+logs/
+*.log
+
+# Test results
+TestResults/
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Documentation
+README.md
+LICENSE
+*.md

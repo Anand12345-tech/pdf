@@ -25,21 +25,14 @@ namespace PdfManagement.Infrastructure.Data.Context
         {
             base.OnModelCreating(builder);
 
-            // Configure DateTime properties for PdfAccessToken to use timestamp without time zone
-            var dateTimeConverter = new ValueConverter<DateTime, DateTime>(
-                v => v,
-                v => DateTime.SpecifyKind(v, DateTimeKind.Unspecified)
-            );
-
+            // Configure DateTime properties for PdfAccessToken to use timestamp with time zone
             builder.Entity<PdfAccessToken>()
                 .Property(e => e.CreatedAt)
-                .HasColumnType("timestamp without time zone")
-                .HasConversion(dateTimeConverter);
+                .HasColumnType("timestamp with time zone");
 
             builder.Entity<PdfAccessToken>()
                 .Property(e => e.ExpiresAt)
-                .HasColumnType("timestamp without time zone")
-                .HasConversion(dateTimeConverter);
+                .HasColumnType("timestamp with time zone");
 
             // Configure PdfDocument entity
             builder.Entity<PdfDocument>(entity =>

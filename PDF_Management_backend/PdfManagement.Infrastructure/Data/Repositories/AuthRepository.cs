@@ -15,15 +15,12 @@ namespace PdfManagement.Infrastructure.Data.Repositories
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
 
-        public AuthRepository(
-            UserManager<ApplicationUser> userManager,
-            SignInManager<ApplicationUser> signInManager)
+        public AuthRepository(  UserManager<ApplicationUser> userManager,  SignInManager<ApplicationUser> signInManager)
         {
             _userManager = userManager;
             _signInManager = signInManager;
         }
 
-        /// <inheritdoc/>
         public async Task<(bool Success, IEnumerable<string> Errors)> CreateUserAsync(ApplicationUser user, string password)
         {
             var result = await _userManager.CreateAsync(user, password);
@@ -36,26 +33,22 @@ namespace PdfManagement.Infrastructure.Data.Repositories
             return (false, result.Errors.Select(e => e.Description));
         }
 
-        /// <inheritdoc/>
         public async Task<ApplicationUser?> FindUserByEmailAsync(string email)
         {
             return await _userManager.FindByEmailAsync(email);
         }
 
-        /// <inheritdoc/>
         public async Task<bool> ValidateUserCredentialsAsync(ApplicationUser user, string password)
         {
             var result = await _signInManager.CheckPasswordSignInAsync(user, password, false);
             return result.Succeeded;
         }
 
-        /// <inheritdoc/>
         public async Task<IEnumerable<string>> GetUserRolesAsync(ApplicationUser user)
         {
             return await _userManager.GetRolesAsync(user);
         }
 
-        /// <inheritdoc/>
         public async Task<bool> AddUserToRoleAsync(ApplicationUser user, string role)
         {
             var result = await _userManager.AddToRoleAsync(user, role);

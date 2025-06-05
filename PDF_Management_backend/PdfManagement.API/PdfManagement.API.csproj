@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
@@ -29,6 +29,7 @@
   <ItemGroup>
     <ProjectReference Include="..\PdfManagement.Core\PdfManagement.Core.csproj" />
     <ProjectReference Include="..\PdfManagement.Infrastructure\PdfManagement.Infrastructure.csproj" />
+    <ProjectReference Include="..\PdfManagement.Models\PdfManagement.Models.csproj" />
   </ItemGroup>
 
 </Project>

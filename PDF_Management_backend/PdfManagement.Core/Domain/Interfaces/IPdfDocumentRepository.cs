@@ -3,61 +3,82 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace PdfManagement.Core.Domain.Interfaces
+namespace PdfManagement.Data.Repositories.Interfaces
 {
     /// <summary>
-    /// Repository interface for PDF document operations
+    /// Repository for PDF document data operations
     /// </summary>
-    public interface IPdfDocumentRepository : IRepository<PdfDocument>
+    public interface IPdfDocumentRepository
     {
+        /// <summary>
+        /// Gets a PDF document by its ID
+        /// </summary>
+        /// <param name="id">The document ID</param>
+        /// <returns>The PDF document or null if not found</returns>
+        Task<PdfDocument> GetByIdAsync(int id);
+
         /// <summary>
         /// Gets all PDF documents for a specific user
         /// </summary>
-        /// <param name="userId">User ID</param>
+        /// <param name="userId">The user ID</param>
         /// <returns>Collection of PDF documents</returns>
         Task<IEnumerable<PdfDocument>> GetByUserIdAsync(string userId);
-        
+
         /// <summary>
-        /// Deletes a PDF document with verification of ownership
+        /// Adds a new PDF document
         /// </summary>
-        /// <param name="id">Document ID</param>
-        /// <param name="userId">User ID for verification</param>
+        /// <param name="document">The document to add</param>
+        /// <returns>The added document with its ID</returns>
+        Task<PdfDocument> AddAsync(PdfDocument document);
+
+        /// <summary>
+        /// Updates an existing PDF document
+        /// </summary>
+        /// <param name="document">The document to update</param>
         /// <returns>True if successful, false otherwise</returns>
-        Task<bool> DeleteWithUserVerificationAsync(int id, string userId);
-        
+        Task<bool> UpdateAsync(PdfDocument document);
+
+        /// <summary>
+        /// Deletes a PDF document
+        /// </summary>
+        /// <param name="id">The document ID</param>
+        /// <param name="userId">The user ID (for verification)</param>
+        /// <returns>True if successful, false otherwise</returns>
+        Task<bool> DeleteAsync(int id, string userId);
+
         /// <summary>
         /// Creates an access token for a PDF document
         /// </summary>
-        /// <param name="token">Access token entity</param>
-        /// <returns>Created access token</returns>
+        /// <param name="token">The access token to create</param>
+        /// <returns>The created access token</returns>
         Task<PdfAccessToken> CreateAccessTokenAsync(PdfAccessToken token);
-        
+
         /// <summary>
         /// Gets a PDF document by an access token
         /// </summary>
-        /// <param name="token">Token value</param>
-        /// <returns>PDF document or null if not found or token expired</returns>
-        Task<PdfDocument?> GetByTokenAsync(Guid token);
-        
+        /// <param name="token">The access token</param>
+        /// <returns>The PDF document or null if not found or token expired</returns>
+        Task<PdfDocument> GetByTokenAsync(Guid token);
+
         /// <summary>
         /// Gets an access token by its value
         /// </summary>
-        /// <param name="token">Token value</param>
-        /// <returns>Access token or null if not found</returns>
-        Task<PdfAccessToken?> GetAccessTokenAsync(Guid token);
-        
+        /// <param name="token">The token value</param>
+        /// <returns>The access token or null if not found</returns>
+        Task<PdfAccessToken> GetAccessTokenAsync(Guid token);
+
         /// <summary>
         /// Updates an access token
         /// </summary>
-        /// <param name="token">Token to update</param>
+        /// <param name="token">The token to update</param>
         /// <returns>True if successful, false otherwise</returns>
         Task<bool> UpdateAccessTokenAsync(PdfAccessToken token);
-        
+
         /// <summary>
         /// Logs an access to a PDF document
         /// </summary>
-        /// <param name="log">Access log entry</param>
-        /// <returns>Created log entry</returns>
+        /// <param name="log">The access log entry</param>
+        /// <returns>The created log entry</returns>
         Task<PdfAccessLog> LogAccessAsync(PdfAccessLog log);
     }
 }

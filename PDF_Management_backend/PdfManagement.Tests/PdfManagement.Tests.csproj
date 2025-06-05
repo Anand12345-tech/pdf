@@ -28,6 +28,7 @@
     <ProjectReference Include="..\PdfManagement.API\PdfManagement.API.csproj" />
     <ProjectReference Include="..\PdfManagement.Core\PdfManagement.Core.csproj" />
     <ProjectReference Include="..\PdfManagement.Infrastructure\PdfManagement.Infrastructure.csproj" />
+    <ProjectReference Include="..\PdfManagement.Models\PdfManagement.Models.csproj" />
   </ItemGroup>
 
 </Project>

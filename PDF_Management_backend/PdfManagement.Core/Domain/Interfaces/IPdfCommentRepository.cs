@@ -2,32 +2,53 @@ using PdfManagement.Core.Domain.Entities;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace PdfManagement.Core.Domain.Interfaces
+namespace PdfManagement.Data.Repositories.Interfaces
 {
     /// <summary>
-    /// Repository interface for PDF comment operations
+    /// Repository for PDF comment data operations
     /// </summary>
-    public interface IPdfCommentRepository : IRepository<PdfComment>
+    public interface IPdfCommentRepository
     {
+        /// <summary>
+        /// Gets a comment by its ID
+        /// </summary>
+        /// <param name="id">The comment ID</param>
+        /// <returns>The comment or null if not found</returns>
+        Task<PdfComment> GetByIdAsync(int id);
+
         /// <summary>
         /// Gets all comments for a specific PDF document
         /// </summary>
-        /// <param name="pdfId">PDF document ID</param>
+        /// <param name="pdfId">The PDF document ID</param>
         /// <returns>Collection of comments</returns>
         Task<IEnumerable<PdfComment>> GetByPdfIdAsync(int pdfId);
-        
+
         /// <summary>
         /// Gets all replies to a specific comment
         /// </summary>
-        /// <param name="commentId">Parent comment ID</param>
+        /// <param name="commentId">The parent comment ID</param>
         /// <returns>Collection of reply comments</returns>
         Task<IEnumerable<PdfComment>> GetRepliesAsync(int commentId);
-        
+
         /// <summary>
-        /// Deletes a comment with all its replies
+        /// Adds a new comment
         /// </summary>
-        /// <param name="id">Comment ID</param>
+        /// <param name="comment">The comment to add</param>
+        /// <returns>The added comment with its ID</returns>
+        Task<PdfComment> AddAsync(PdfComment comment);
+
+        /// <summary>
+        /// Updates an existing comment
+        /// </summary>
+        /// <param name="comment">The comment to update</param>
         /// <returns>True if successful, false otherwise</returns>
-        Task<bool> DeleteWithRepliesAsync(int id);
+        Task<bool> UpdateAsync(PdfComment comment);
+
+        /// <summary>
+        /// Deletes a comment
+        /// </summary>
+        /// <param name="id">The comment ID</param>
+        /// <returns>True if successful, false otherwise</returns>
+        Task<bool> DeleteAsync(int id);
     }
 }

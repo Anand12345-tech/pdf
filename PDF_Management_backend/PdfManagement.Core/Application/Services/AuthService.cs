@@ -21,20 +21,12 @@ namespace PdfManagement.Core.Application.Services
         private readonly IAuthRepository _authRepository;
         private readonly IConfiguration _configuration;
 
-        public AuthService(
-            IAuthRepository authRepository,
-            IConfiguration configuration)
+        public AuthService( IAuthRepository authRepository,IConfiguration configuration)
         {
             _authRepository = authRepository;
             _configuration = configuration;
         }
-
-        /// <inheritdoc/>
-        public async Task<(bool Success, string[] Errors)> RegisterUserAsync(
-           string email, 
-            string password, 
-            string firstName, 
-            string lastName)
+        public async Task<(bool Success, string[] Errors)> RegisterUserAsync(string email,  string password,  string firstName, string lastName)
         {
             var user = new ApplicationUser
             {
@@ -48,7 +40,6 @@ namespace PdfManagement.Core.Application.Services
 
             if (success)
             {
-                // Add user to default role
                 await _authRepository.AddUserToRoleAsync(user, "User");
                 return (true, Array.Empty<string>());
             }

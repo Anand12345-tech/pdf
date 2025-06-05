@@ -12,10 +12,10 @@ namespace PdfManagement.Core.Domain.Entities
         public int DocumentId { get; set; }
         public Guid Token { get; set; }
         
-        [Column(TypeName = "timestamp without time zone")]
+        [Column(TypeName = "timestamp with time zone")]
         public DateTime CreatedAt { get; set; }
         
-        [Column(TypeName = "timestamp without time zone")]
+        [Column(TypeName = "timestamp with time zone")]
         public DateTime ExpiresAt { get; set; }
         
         public bool IsRevoked { get; set; }

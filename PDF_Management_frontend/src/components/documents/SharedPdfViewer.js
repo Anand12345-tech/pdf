@@ -38,8 +38,9 @@ const SharedPdfViewer = () => {
 
   // Helper function to get API base URL
   const getApiBaseUrl = () => {
+    // Make sure this returns the correct API URL
     return process.env.REACT_APP_API_URL || 
-           `${window.location.protocol}//${window.location.host.replace('3000', '5000')}/api`;
+           `${window.location.protocol}//${window.location.hostname}:5000/api`;
   };
 
   useEffect(() => {
@@ -55,93 +56,118 @@ const SharedPdfViewer = () => {
         let url;
         if (isUuidToken) {
           // Handle standard token (UUID)
-          // Get API base URL from environment or use default
           const apiBaseUrl = getApiBaseUrl();
+          console.log('API Base URL:', apiBaseUrl); // Debug log
           
           // Convert to API endpoint format for direct viewing
           const apiUrl = `${apiBaseUrl}/Public/view/${token}`;
+          console.log('Fetching document details from:', apiUrl); // Debug log
           
-          // Fetch document details first
-          const response = await fetch(apiUrl);
-          if (!response.ok) {
-            throw new Error('Failed to fetch document');
-          }
-          const data = await response.json();
-          setDocumentInfo(data.document);
-          
-          // Process comments to ensure commenterName is properly used
-          const processedComments = data.comments?.map(comment => {
-            // Try to get stored name from localStorage
-            let storedNames = {};
-            try {
-              const storedNamesStr = localStorage.getItem('commentNames');
-              if (storedNamesStr) {
-                storedNames = JSON.parse(storedNamesStr);
-              }
-            } catch (e) {
-              console.error('Error parsing stored names:', e);
+          try {
+            // Fetch document details first
+            const response = await fetch(apiUrl);
+            console.log('Document details response:', response.status); // Debug log
+            
+            if (!response.ok) {
+              throw new Error(`Failed to fetch document: ${response.status} ${response.statusText}`);
             }
             
-            return {
-              ...comment,
-              commenterName: comment.commenterName || storedNames[comment.id] || 'Anonymous',
-              replies: comment.replies?.map(reply => ({
-                ...reply,
-                commenterName: reply.commenterName || storedNames[reply.id] || 'Anonymous'
-              })) || []
-            };
-          }) || [];
-          setComments(processedComments);
-          
-          // Then get the download URL for viewing
-          const downloadUrl = `${apiBaseUrl}/Public/download/${token}`;
-          const blobResponse = await fetch(downloadUrl);
-          const blob = await blobResponse.blob();
-          url = URL.createObjectURL(blob);
+            const data = await response.json();
+            setDocumentInfo(data.document);
+            
+            // Process comments to ensure commenterName is properly used
+            const processedComments = data.comments?.map(comment => {
+              // Try to get stored name from localStorage
+              let storedNames = {};
+              try {
+                const storedNamesStr = localStorage.getItem('commentNames');
+                if (storedNamesStr) {
+                  storedNames = JSON.parse(storedNamesStr);
+                }
+              } catch (e) {
+                console.error('Error parsing stored names:', e);
+              }
+              
+              return {
+                ...comment,
+                commenterName: comment.commenterName || storedNames[comment.id] || 'Anonymous',
+                replies: comment.replies?.map(reply => ({
+                  ...reply,
+                  commenterName: reply.commenterName || storedNames[reply.id] || 'Anonymous'
+                })) || []
+              };
+            }) || [];
+            setComments(processedComments);
+            
+            // Then get the download URL for viewing
+            const downloadUrl = `${apiBaseUrl}/Public/download/${token}`;
+            console.log('Fetching PDF from:', downloadUrl); // Debug log
+            
+            const blobResponse = await fetch(downloadUrl);
+            console.log('PDF response:', blobResponse.status); // Debug log
+            
+            if (!blobResponse.ok) {
+              throw new Error(`Failed to fetch PDF: ${blobResponse.status} ${blobResponse.statusText}`);
+            }
+            
+            const blob = await blobResponse.blob();
+            url = URL.createObjectURL(blob);
+          } catch (detailsError) {
+            console.error('Error fetching document details:', detailsError);
+            throw detailsError;
+          }
         } else {
           // Handle JWT token
-          url = await viewSharedDocumentJwt(token);
-          // For JWT tokens, we need to fetch comments separately
           try {
-            // Extract the token ID from the JWT (if possible)
-            const tokenParts = token.split('.');
-            if (tokenParts.length === 3) {
-              const payload = JSON.parse(atob(tokenParts[1]));
-              if (payload.tokenId) {
-                const commentsResponse = await fetch(`${getApiBaseUrl()}/Public/view/${payload.tokenId}`);
-                if (commentsResponse.ok) {
-                  const data = await commentsResponse.json();
-                  setDocumentInfo(data.document);
-                  
-                  // Process comments to ensure commenterName is properly used
-                  const processedComments = data.comments?.map(comment => {
-                    // Try to get stored name from localStorage
-                    let storedNames = {};
-                    try {
-                      const storedNamesStr = localStorage.getItem('commentNames');
-                      if (storedNamesStr) {
-                        storedNames = JSON.parse(storedNamesStr);
-                      }
-                    } catch (e) {
-                      console.error('Error parsing stored names:', e);
-                    }
+            console.log('Using JWT token to fetch document');
+            url = await viewSharedDocumentJwt(token);
+            console.log('Successfully fetched document with JWT token');
+            
+            // For JWT tokens, we need to fetch comments separately
+            try {
+              // Extract the token ID from the JWT (if possible)
+              const tokenParts = token.split('.');
+              if (tokenParts.length === 3) {
+                const payload = JSON.parse(atob(tokenParts[1]));
+                if (payload.tokenId) {
+                  const commentsResponse = await fetch(`${getApiBaseUrl()}/Public/view/${payload.tokenId}`);
+                  if (commentsResponse.ok) {
+                    const data = await commentsResponse.json();
+                    setDocumentInfo(data.document);
                     
-                    return {
-                      ...comment,
-                      commenterName: comment.commenterName || storedNames[comment.id] || 'Anonymous',
-                      replies: comment.replies?.map(reply => ({
-                        ...reply,
-                        commenterName: reply.commenterName || storedNames[reply.id] || 'Anonymous'
-                      })) || []
-                    };
-                  }) || [];
-                  setComments(processedComments);
+                    // Process comments to ensure commenterName is properly used
+                    const processedComments = data.comments?.map(comment => {
+                      // Try to get stored name from localStorage
+                      let storedNames = {};
+                      try {
+                        const storedNamesStr = localStorage.getItem('commentNames');
+                        if (storedNamesStr) {
+                          storedNames = JSON.parse(storedNamesStr);
+                        }
+                      } catch (e) {
+                        console.error('Error parsing stored names:', e);
+                      }
+                      
+                      return {
+                        ...comment,
+                        commenterName: comment.commenterName || storedNames[comment.id] || 'Anonymous',
+                        replies: comment.replies?.map(reply => ({
+                          ...reply,
+                          commenterName: reply.commenterName || storedNames[reply.id] || 'Anonymous'
+                        })) || []
+                      };
+                    }) || [];
+                    setComments(processedComments);
+                  }
                 }
               }
+            } catch (commentErr) {
+              console.error('Error fetching comments:', commentErr);
+              // Non-critical error, don't show to user
             }
-          } catch (commentErr) {
-            console.error('Error fetching comments:', commentErr);
-            // Non-critical error, don't show to user
+          } catch (jwtError) {
+            console.error('Error fetching document with JWT:', jwtError);
+            throw jwtError;
           }
         }
         
@@ -168,7 +194,8 @@ const SharedPdfViewer = () => {
     setPdfError(false);
   };
 
-  const onDocumentLoadError = () => {
+  const onDocumentLoadError = (error) => {
+    console.error('Error loading PDF document:', error);
     setPdfError(true);
   };
 

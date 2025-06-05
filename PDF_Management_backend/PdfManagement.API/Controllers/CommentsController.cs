@@ -4,6 +4,7 @@ using PdfManagement.API.Models.Comments;
 using PdfManagement.API.Models.Common;
 using PdfManagement.Core.Application.Interfaces;
 using PdfManagement.Core.Domain.Entities;
+using PdfManagement.Services.Interfaces;
 using Swashbuckle.AspNetCore.Annotations;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,7 +15,6 @@ namespace PdfManagement.API.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    //[Authorize]
     [SwaggerTag("Endpoints for managing document comments")]
     public class CommentsController : ControllerBase
     {
@@ -51,7 +51,7 @@ namespace PdfManagement.API.Controllers
 
             var comments = await _commentService.GetCommentsForPdfAsync(documentId);
             var result = comments.Select(MapToCommentViewModel).ToList();
-            
+
             return Ok(result);
         }
 
@@ -68,7 +68,7 @@ namespace PdfManagement.API.Controllers
         {
             var replies = await _commentService.GetCommentRepliesAsync(commentId);
             var result = replies.Select(MapToCommentViewModel).ToList();
-            
+
             return Ok(result);
         }
 
@@ -89,7 +89,7 @@ namespace PdfManagement.API.Controllers
             {
                 return BadRequest(ModelState);
             }
-            
+
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "demo-user";
             var document = await _documentService.GetPdfByIdAsync(documentId);
 
@@ -109,7 +109,7 @@ namespace PdfManagement.API.Controllers
                     model.ParentCommentId);
 
                 var result = MapToCommentViewModel(comment);
-                
+
                 return CreatedAtAction(nameof(GetCommentReplies), new { commentId = comment.Id }, result);
             }
             catch (System.ArgumentException ex)
@@ -135,7 +135,7 @@ namespace PdfManagement.API.Controllers
             {
                 return BadRequest(ModelState);
             }
-            
+
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "demo-user";
             var updatedComment = await _commentService.UpdateCommentAsync(commentId, model.Content, userId);
 
@@ -170,7 +170,7 @@ namespace PdfManagement.API.Controllers
 
             return NoContent();
         }
-        
+
         private CommentViewModel MapToCommentViewModel(PdfComment comment)
         {
             return new CommentViewModel
