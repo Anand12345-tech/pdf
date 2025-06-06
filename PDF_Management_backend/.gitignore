@@ -29,9 +29,11 @@ bld/
 # Environment files
 .env
 .env.local
+.env.development
 .env.development.local
 .env.test.local
 .env.production.local
+.env.production
 appsettings.Development.json
 appsettings.Production.json
 
@@ -46,4 +48,18 @@ node_modules/
 .DS_Store
 Thumbs.db
 
+# Credentials and secrets
 /pdf_service.txt
+**/credentials/*.json
+**/credentials/service-account.json
+**/service-account.json
+**/*-key.json
+**/*.p12
+**/*.pem
+**/google-credentials.json
+**/google-drive-credentials.json
+
+# Keep example files
+!.env.example
+!appsettings.example.json
+!appsettings.Template.json

@@ -23,17 +23,20 @@ namespace PdfManagement.API.Controllers
     public class PublicController : ControllerBase
     {
         private readonly IPublicAccessService _publicAccessService;
-        private readonly IFileStorageService _fileStorageService;
+        private readonly IGoogleStorageService _googleStorageService;
         private readonly IConfiguration _configuration;
+        private readonly ILogger<PublicController> _logger;
 
         public PublicController(
             IPublicAccessService publicAccessService,
-            IFileStorageService fileStorageService,
-            IConfiguration configuration)
+            IGoogleStorageService googleStorageService,
+            IConfiguration configuration,
+            ILogger<PublicController> logger)
         {
             _publicAccessService = publicAccessService;
-            _fileStorageService = fileStorageService;
+            _googleStorageService = googleStorageService;
             _configuration = configuration;
+            _logger = logger;
         }
 
         [HttpGet("view/{token}")]
@@ -48,7 +51,7 @@ namespace PdfManagement.API.Controllers
         [ResponseCache(Duration = 60)] // Cache for 1 minute
         public async Task<IActionResult> View(Guid token)
         {
-            Console.WriteLine($"View request received for token: {token}");
+            _logger.LogInformation($"View request received for token: {token}");
             
             var document = await _publicAccessService.GetDocumentByTokenAsync(
                 token,
@@ -57,7 +60,7 @@ namespace PdfManagement.API.Controllers
 
             if (document == null)
             {
-                Console.WriteLine($"Document not found for token: {token}");
+                _logger.LogWarning($"Document not found for token: {token}");
                 return NotFound(new ApiResponse { Success = false, Message = "Document not found or access token has expired" });
             }
 
@@ -111,7 +114,7 @@ namespace PdfManagement.API.Controllers
                 DownloadUrl = Url.ActionLink("Download", "Public", new { token = token }) ?? string.Empty
             };
 
-            Console.WriteLine($"Returning document info: {document.FileName}, ID: {document.Id}");
+            _logger.LogInformation($"Returning document info: {document.FileName}, ID: {document.Id}");
             return Ok(response);
         }
 
@@ -127,7 +130,7 @@ namespace PdfManagement.API.Controllers
         [SwaggerResponse(StatusCodes.Status400BadRequest, "Invalid token")]
         public async Task<IActionResult> ViewWithJwt(string token)
         {
-            Console.WriteLine($"JWT view request received for token: {token.Substring(0, Math.Min(token.Length, 20))}...");
+            _logger.LogInformation($"JWT view request received for token: {token.Substring(0, Math.Min(token.Length, 20))}...");
             
             try
             {
@@ -155,7 +158,7 @@ namespace PdfManagement.API.Controllers
                 var documentIdClaim = principal.FindFirst("documentId");
                 if (documentIdClaim == null || !int.TryParse(documentIdClaim.Value, out int documentId))
                 {
-                    Console.WriteLine("Invalid token: missing or invalid document ID");
+                    _logger.LogWarning("Invalid token: missing or invalid document ID");
                     return BadRequest(new ApiResponse { Success = false, Message = "Invalid token: missing or invalid document ID" });
                 }
 
@@ -163,7 +166,7 @@ namespace PdfManagement.API.Controllers
                 var tokenIdClaim = principal.FindFirst("tokenId");
                 if (tokenIdClaim == null || !Guid.TryParse(tokenIdClaim.Value, out Guid tokenId))
                 {
-                    Console.WriteLine("Invalid token: missing or invalid token ID");
+                    _logger.LogWarning("Invalid token: missing or invalid token ID");
                     return BadRequest(new ApiResponse { Success = false, Message = "Invalid token: missing or invalid token ID" });
                 }
 
@@ -175,49 +178,49 @@ namespace PdfManagement.API.Controllers
 
                 if (document == null || document.Id != documentId)
                 {
-                    Console.WriteLine($"Document not found for token ID: {tokenId}, document ID: {documentId}");
+                    _logger.LogWarning($"Document not found for token ID: {tokenId}, document ID: {documentId}");
                     return NotFound(new ApiResponse { Success = false, Message = "Document not found or access token has expired" });
                 }
 
                 // Return the PDF file for viewing
                 try
                 {
-                    Console.WriteLine($"Fetching file from path: {document.FilePath}");
-                    var fileBytes = await _fileStorageService.GetFileAsync(document.FilePath);
+                    _logger.LogInformation($"Fetching file from path: {document.FilePath}");
+                    var fileBytes = await _googleStorageService.GetFileAsync(document.FilePath);
                     
                     // Set CORS headers to allow viewing from any origin
                     Response.Headers.Add("Access-Control-Allow-Origin", "*");
                     Response.Headers.Add("Access-Control-Allow-Methods", "GET");
                     Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization");
                     
-                    Console.WriteLine($"Returning file: {document.FileName}, Content-Type: {document.ContentType}, Size: {fileBytes.Length} bytes");
+                    _logger.LogInformation($"Returning file: {document.FileName}, Content-Type: {document.ContentType}, Size: {fileBytes.Length} bytes");
                     return File(fileBytes, "application/pdf", document.FileName, false);
                 }
                 catch (FileNotFoundException ex)
                 {
-                    Console.WriteLine($"File not found: {ex.Message}");
+                    _logger.LogWarning(ex, $"File not found: {ex.Message}");
                     return NotFound(new ApiResponse { Success = false, Message = "File not found" });
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error retrieving file: {ex.Message}");
+                    _logger.LogError(ex, $"Error retrieving file: {ex.Message}");
                     return StatusCode(StatusCodes.Status500InternalServerError,
                         new ApiResponse { Success = false, Message = $"An error occurred: {ex.Message}" });
                 }
             }
             catch (SecurityTokenExpiredException ex)
             {
-                Console.WriteLine($"Token expired: {ex.Message}");
+                _logger.LogWarning(ex, $"Token expired: {ex.Message}");
                 return BadRequest(new ApiResponse { Success = false, Message = "Token has expired" });
             }
             catch (SecurityTokenException ex)
             {
-                Console.WriteLine($"Invalid token: {ex.Message}");
+                _logger.LogWarning(ex, $"Invalid token: {ex.Message}");
                 return BadRequest(new ApiResponse { Success = false, Message = $"Invalid token: {ex.Message}" });
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error processing JWT: {ex.Message}");
+                _logger.LogError(ex, $"Error processing JWT: {ex.Message}");
                 return StatusCode(StatusCodes.Status500InternalServerError,
                     new ApiResponse { Success = false, Message = $"An error occurred: {ex.Message}" });
             }
@@ -236,7 +239,7 @@ namespace PdfManagement.API.Controllers
         [ResponseCache(Duration = 300)] // Cache for 5 minutes
         public async Task<IActionResult> Download(Guid token)
         {
-            Console.WriteLine($"Download request received for token: {token}");
+            _logger.LogInformation($"Download request received for token: {token}");
             
             var document = await _publicAccessService.GetDocumentByTokenAsync(
                 token,
@@ -245,31 +248,31 @@ namespace PdfManagement.API.Controllers
 
             if (document == null)
             {
-                Console.WriteLine($"Document not found for token: {token}");
+                _logger.LogWarning($"Document not found for token: {token}");
                 return NotFound(new ApiResponse { Success = false, Message = "Document not found or access token has expired" });
             }
 
             try
             {
-                Console.WriteLine($"Fetching file from path: {document.FilePath}");
-                var fileBytes = await _fileStorageService.GetFileAsync(document.FilePath);
+                _logger.LogInformation($"Fetching file from path: {document.FilePath}");
+                var fileBytes = await _googleStorageService.GetFileAsync(document.FilePath);
                 
                 // Set CORS headers to allow download from any origin
                 Response.Headers.Add("Access-Control-Allow-Origin", "*");
                 Response.Headers.Add("Access-Control-Allow-Methods", "GET");
                 Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization");
                 
-                Console.WriteLine($"Returning file: {document.FileName}, Content-Type: {document.ContentType}, Size: {fileBytes.Length} bytes");
+                _logger.LogInformation($"Returning file: {document.FileName}, Content-Type: {document.ContentType}, Size: {fileBytes.Length} bytes");
                 return File(fileBytes, document.ContentType, document.FileName);
             }
             catch (FileNotFoundException ex)
             {
-                Console.WriteLine($"File not found: {ex.Message}");
+                _logger.LogWarning(ex, $"File not found: {ex.Message}");
                 return NotFound(new ApiResponse { Success = false, Message = "File not found" });
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error downloading file: {ex.Message}");
+                _logger.LogError(ex, $"Error downloading file: {ex.Message}");
                 return StatusCode(StatusCodes.Status500InternalServerError,
                     new ApiResponse { Success = false, Message = "An error occurred while downloading the file" });
             }
@@ -302,7 +305,7 @@ namespace PdfManagement.API.Controllers
         [RateLimit(Name = "PublicComment", Seconds = 60, Limit = 5)]
         public async Task<IActionResult> AddComment(Guid token, [FromBody] AddCommentRequest model)
         {
-            Console.WriteLine($"Add comment request received for token: {token}");
+            _logger.LogInformation($"Add comment request received for token: {token}");
             
             if (!ModelState.IsValid)
             {
@@ -318,7 +321,7 @@ namespace PdfManagement.API.Controllers
 
             if (comment == null)
             {
-                Console.WriteLine($"Document not found for token: {token}");
+                _logger.LogWarning($"Document not found for token: {token}");
                 return NotFound(new ApiResponse { Success = false, Message = "Document not found or access token has expired" });
             }
 
@@ -359,7 +362,7 @@ namespace PdfManagement.API.Controllers
                 Replies = new System.Collections.Generic.List<CommentViewModel>()
             };
 
-            Console.WriteLine($"Comment added successfully: ID {comment.Id}");
+            _logger.LogInformation($"Comment added successfully: ID {comment.Id}");
             return Ok(new
             {
                 comment = newCommentViewModel,
@@ -382,7 +385,7 @@ namespace PdfManagement.API.Controllers
         [SwaggerResponse(StatusCodes.Status500InternalServerError, "Server error")]
         public async Task<IActionResult> AddCommentJwt(string token, [FromBody] AddCommentRequest model)
         {
-            Console.WriteLine($"Add comment JWT request received for token: {token.Substring(0, Math.Min(token.Length, 20))}...");
+            _logger.LogInformation($"Add comment JWT request received for token: {token.Substring(0, Math.Min(token.Length, 20))}...");
             
             if (!ModelState.IsValid)
             {
@@ -415,7 +418,7 @@ namespace PdfManagement.API.Controllers
                 var tokenIdClaim = principal.FindFirst("tokenId");
                 if (tokenIdClaim == null || !Guid.TryParse(tokenIdClaim.Value, out Guid tokenId))
                 {
-                    Console.WriteLine("Invalid token: missing or invalid token ID");
+                    _logger.LogWarning("Invalid token: missing or invalid token ID");
                     return BadRequest(new ApiResponse { Success = false, Message = "Invalid token: missing or invalid token ID" });
                 }
 
@@ -429,7 +432,7 @@ namespace PdfManagement.API.Controllers
 
                 if (comment == null)
                 {
-                    Console.WriteLine($"Document not found for token ID: {tokenId}");
+                    _logger.LogWarning($"Document not found for token ID: {tokenId}");
                     return NotFound(new ApiResponse { Success = false, Message = "Document not found or access token has expired" });
                 }
 
@@ -470,7 +473,7 @@ namespace PdfManagement.API.Controllers
                     Replies = new System.Collections.Generic.List<CommentViewModel>()
                 };
 
-                Console.WriteLine($"Comment added successfully via JWT: ID {comment.Id}");
+                _logger.LogInformation($"Comment added successfully via JWT: ID {comment.Id}");
                 return Ok(new
                 {
                     comment = newCommentViewModel,
@@ -481,17 +484,17 @@ namespace PdfManagement.API.Controllers
             }
             catch (SecurityTokenExpiredException ex)
             {
-                Console.WriteLine($"Token expired: {ex.Message}");
+                _logger.LogWarning(ex, $"Token expired: {ex.Message}");
                 return BadRequest(new ApiResponse { Success = false, Message = "Token has expired" });
             }
             catch (SecurityTokenException ex)
             {
-                Console.WriteLine($"Invalid token: {ex.Message}");
+                _logger.LogWarning(ex, $"Invalid token: {ex.Message}");
                 return BadRequest(new ApiResponse { Success = false, Message = $"Invalid token: {ex.Message}" });
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error adding comment via JWT: {ex.Message}");
+                _logger.LogError(ex, $"Error adding comment via JWT: {ex.Message}");
                 return StatusCode(StatusCodes.Status500InternalServerError,
                     new ApiResponse { Success = false, Message = $"An error occurred: {ex.Message}" });
             }

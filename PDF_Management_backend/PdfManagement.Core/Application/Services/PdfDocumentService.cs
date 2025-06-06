@@ -1,3 +1,4 @@
+using Google.Apis.Drive.v3.Data;
 using Microsoft.AspNetCore.Http;
 using PdfManagement.Core.Application.Interfaces;
 using PdfManagement.Core.Domain.Entities;
@@ -17,12 +18,13 @@ namespace PdfManagement.Services.Implementations
     public class PdfDocumentService : IPdfDocumentService
     {
         private readonly IPdfDocumentRepository _pdfDocumentRepository;
-        private readonly IFileStorageService _fileStorageService;
+        private readonly IGoogleStorageService _googleStorageService;
 
-        public PdfDocumentService(  IPdfDocumentRepository pdfDocumentRepository, IFileStorageService fileStorageService)
+        public PdfDocumentService(IPdfDocumentRepository pdfDocumentRepository, IGoogleStorageService googleStorageService)
         {
             _pdfDocumentRepository = pdfDocumentRepository;
-            _fileStorageService = fileStorageService;
+            _googleStorageService = googleStorageService;
+
         }
 
         /// <inheritdoc/>
@@ -43,13 +45,14 @@ namespace PdfManagement.Services.Implementations
             var uniqueFileName = $"{Guid.NewGuid()}_{fileName}";
 
             // Save the file
-            var filePath = await _fileStorageService.SaveFileAsync(file, uniqueFileName);
+            //var filePath = await _fileStorageService.SaveFileAsync(file, uniqueFileName);
+            var filepath = await _googleStorageService.SaveFileAsync(file,uniqueFileName);
 
             // Create document record
             var document = new PdfDocument
             {
                 FileName = fileName,
-                FilePath = filePath,
+                FilePath = filepath,
                 FileSize = file.Length,
                 ContentType = file.ContentType,
                 UploaderId = userId,
@@ -79,7 +82,8 @@ namespace PdfManagement.Services.Implementations
                 return false;
             }
 
-            await _fileStorageService.DeleteFileAsync(document.FilePath);
+            //await _fileStorageService.DeleteFileAsync(document.FilePath);
+            await _googleStorageService.DeleteFileAsync(document.FilePath);
 
             return await _pdfDocumentRepository.DeleteAsync(id, userId);
         }

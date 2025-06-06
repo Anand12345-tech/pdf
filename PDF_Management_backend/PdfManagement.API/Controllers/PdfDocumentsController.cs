@@ -23,12 +23,17 @@ namespace PdfManagement.API.Controllers
     public class PdfDocumentsController : ControllerBase
     {
         private readonly IPdfDocumentService _pdfDocumentService;
-        private readonly IFileStorageService _fileStorageService;
+        private readonly IGoogleStorageService _googleStorageService;
+        private readonly ILogger<PdfDocumentsController> _logger;
 
-        public PdfDocumentsController(IPdfDocumentService pdfDocumentService,IFileStorageService fileStorageService)
+        public PdfDocumentsController(
+            IPdfDocumentService pdfDocumentService,
+            IGoogleStorageService googleStorageService,
+            ILogger<PdfDocumentsController> logger)
         {
             _pdfDocumentService = pdfDocumentService;
-            _fileStorageService = fileStorageService;
+            _googleStorageService = googleStorageService;
+            _logger = logger;
         }
 
         [HttpGet]
@@ -37,6 +42,8 @@ namespace PdfManagement.API.Controllers
         public async Task<ActionResult<IEnumerable<DocumentViewModel>>> GetUserDocuments()
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "demo-user";
+            _logger.LogInformation($"Getting documents for user: {userId}");
+            
             var documents = await _pdfDocumentService.GetUserPdfsAsync(userId);
 
             var result = new List<DocumentViewModel>();
@@ -63,10 +70,13 @@ namespace PdfManagement.API.Controllers
         public async Task<ActionResult<DocumentViewModel>> GetDocument(int id)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "demo-user";
+            _logger.LogInformation($"Getting document {id} for user: {userId}");
+            
             var document = await _pdfDocumentService.GetPdfByIdAsync(id);
 
             if (document == null || document.UploaderId != userId)
             {
+                _logger.LogWarning($"Document {id} not found or not owned by user {userId}");
                 return NotFound();
             }
 
@@ -92,17 +102,21 @@ namespace PdfManagement.API.Controllers
         {
             if (file == null || file.Length == 0)
             {
+                _logger.LogWarning("Upload attempt with null or empty file");
                 return BadRequest(new ApiResponse { Success = false, Message = "No file uploaded." });
             }
 
             if (file.ContentType != "application/pdf")
             {
+                _logger.LogWarning($"Upload attempt with invalid file type: {file.ContentType}");
                 return BadRequest(new ApiResponse { Success = false, Message = "Only PDF files are allowed." });
             }
 
             try
             {
                 var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "demo-user";
+                _logger.LogInformation($"Uploading document for user: {userId}, filename: {file.FileName}, size: {file.Length} bytes");
+                
                 var document = await _pdfDocumentService.UploadPdfAsync(file, userId);
 
                 var result = new DocumentViewModel
@@ -114,10 +128,12 @@ namespace PdfManagement.API.Controllers
                     DownloadUrl = Url.ActionLink("DownloadDocument", "PdfDocuments", new { id = document.Id }) ?? string.Empty
                 };
 
+                _logger.LogInformation($"Document uploaded successfully with ID: {document.Id}");
                 return CreatedAtAction(nameof(GetDocument), new { id = document.Id }, result);
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error uploading document");
                 return StatusCode(StatusCodes.Status500InternalServerError,
                     new ApiResponse { Success = false, Message = ex.Message });
             }
@@ -130,13 +146,17 @@ namespace PdfManagement.API.Controllers
         public async Task<IActionResult> DeleteDocument(int id)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "demo-user";
+            _logger.LogInformation($"Deleting document {id} for user: {userId}");
+            
             var result = await _pdfDocumentService.DeletePdfAsync(id, userId);
 
             if (!result)
             {
+                _logger.LogWarning($"Document {id} not found or not owned by user {userId}");
                 return NotFound(new ApiResponse { Success = false, Message = "Document not found or you don't have permission to delete it" });
             }
 
+            _logger.LogInformation($"Document {id} deleted successfully");
             return NoContent();
         }
 
@@ -149,6 +169,7 @@ namespace PdfManagement.API.Controllers
         public async Task<ActionResult<ShareDocumentResponse>> ShareDocument(int id, [FromBody] ShareDocumentModel model)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "demo-user";
+            _logger.LogInformation($"Sharing document {id} for user: {userId}");
 
             try
             {
@@ -156,6 +177,7 @@ namespace PdfManagement.API.Controllers
                 var document = await _pdfDocumentService.GetPdfByIdAsync(id);
                 if (document == null || document.UploaderId != userId)
                 {
+                    _logger.LogWarning($"Document {id} not found or not owned by user {userId}");
                     return NotFound(new ApiResponse { Success = false, Message = "Document not found" });
                 }
 
@@ -183,14 +205,17 @@ namespace PdfManagement.API.Controllers
                     Url = $"{baseUrl}/shared-pdf/{token.Token}"
                 };
 
+                _logger.LogInformation($"Share link generated for document {id} with token {token.Token}");
                 return Ok(response);
             }
             catch (ArgumentException ex)
             {
+                _logger.LogWarning(ex, $"Bad request when sharing document {id}");
                 return BadRequest(new ApiResponse { Success = false, Message = ex.Message });
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, $"Error sharing document {id}");
                 return StatusCode(StatusCodes.Status500InternalServerError,
                     new ApiResponse { Success = false, Message = $"An error occurred while sharing the document: {ex.Message}" });
             }
@@ -205,6 +230,7 @@ namespace PdfManagement.API.Controllers
         public async Task<ActionResult<JwtShareResponse>> ShareDocumentJwt(int id, [FromBody] ShareDocumentModel model)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "demo-user";
+            _logger.LogInformation($"Generating JWT share token for document {id} for user: {userId}");
 
             try
             {
@@ -212,6 +238,7 @@ namespace PdfManagement.API.Controllers
                 var document = await _pdfDocumentService.GetPdfByIdAsync(id);
                 if (document == null || document.UploaderId != userId)
                 {
+                    _logger.LogWarning($"Document {id} not found or not owned by user {userId}");
                     return NotFound(new ApiResponse { Success = false, Message = "Document not found" });
                 }
 
@@ -232,7 +259,7 @@ namespace PdfManagement.API.Controllers
                 {
                     // Fallback to a default key (not recommended for production)
                     jwtKey = "ThisIsMySecretKeyForPdfManagementApplication12345ThisIsALongerKeyToMeetRequirements";
-                    Console.WriteLine("WARNING: Using default JWT key. Set JWT_KEY environment variable for security.");
+                    _logger.LogWarning("Using default JWT key. Set JWT_KEY environment variable for security.");
                 }
 
                 var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
@@ -262,14 +289,17 @@ namespace PdfManagement.API.Controllers
                     ShareUrl = shareUrl
                 };
 
+                _logger.LogInformation($"JWT share token generated for document {id}");
                 return Ok(response);
             }
             catch (ArgumentException ex)
             {
+                _logger.LogWarning(ex, $"Bad request when generating JWT share token for document {id}");
                 return BadRequest(new ApiResponse { Success = false, Message = ex.Message });
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, $"Error generating JWT share token for document {id}");
                 return StatusCode(StatusCodes.Status500InternalServerError,
                     new ApiResponse { Success = false, Message = $"An error occurred while sharing the document: {ex.Message}" });
             }
@@ -284,33 +314,41 @@ namespace PdfManagement.API.Controllers
         {
             try
             {
+                _logger.LogInformation($"Downloading document {id}");
+                
                 // For demo purposes, don't check user ID
                 var document = await _pdfDocumentService.GetPdfByIdAsync(id);
 
                 if (document == null)
                 {
+                    _logger.LogWarning($"Document {id} not found");
                     return NotFound(new ApiResponse { Success = false, Message = "Document not found" });
                 }
 
-                var fileBytes = await _fileStorageService.GetFileAsync(document.FilePath);
+                // Get file from Google Cloud Storage
+                var fileBytes = await _googleStorageService.GetFileAsync(document.FilePath);
 
                 // Set CORS headers to allow download from any origin
                 Response.Headers.Add("Access-Control-Allow-Origin", "*");
                 Response.Headers.Add("Access-Control-Allow-Methods", "GET");
                 Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
+                _logger.LogInformation($"Document {id} downloaded successfully, size: {fileBytes.Length} bytes");
                 return File(fileBytes, document.ContentType, document.FileName);
             }
-            catch (FileNotFoundException)
+            catch (FileNotFoundException ex)
             {
+                _logger.LogWarning(ex, $"File not found for document {id}");
                 return NotFound(new ApiResponse { Success = false, Message = "File not found" });
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, $"Error downloading document {id}");
                 return StatusCode(StatusCodes.Status500InternalServerError,
                     new ApiResponse { Success = false, Message = $"An error occurred while downloading the file: {ex.Message}" });
             }
         }
+        
         [HttpGet("view/{id}")]
         //[Authorize]
         [SwaggerOperation(
@@ -324,25 +362,32 @@ namespace PdfManagement.API.Controllers
         public async Task<IActionResult> ViewDocument(int id)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "demo-user";
+            _logger.LogInformation($"Viewing document {id} for user: {userId}");
+            
             var document = await _pdfDocumentService.GetPdfByIdAsync(id);
 
             if (document == null || document.UploaderId != userId)
             {
+                _logger.LogWarning($"Document {id} not found or not owned by user {userId}");
                 return NotFound(new ApiResponse { Success = false, Message = "Document not found" });
             }
 
             try
             {
-                var fileBytes = await _fileStorageService.GetFileAsync(document.FilePath);
+                // Get file from Google Cloud Storage
+                var fileBytes = await _googleStorageService.GetFileAsync(document.FilePath);
 
+                _logger.LogInformation($"Document {id} viewed successfully, size: {fileBytes.Length} bytes");
                 return File(fileBytes, "application/pdf", document.FileName, false);
             }
-            catch (FileNotFoundException)
+            catch (FileNotFoundException ex)
             {
+                _logger.LogWarning(ex, $"File not found for document {id}");
                 return NotFound(new ApiResponse { Success = false, Message = "File not found" });
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, $"Error viewing document {id}");
                 return StatusCode(StatusCodes.Status500InternalServerError,
                     new ApiResponse { Success = false, Message = $"An error occurred: {ex.Message}" });
             }

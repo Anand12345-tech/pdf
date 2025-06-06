@@ -145,7 +145,9 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IPdfDocumentService, PdfDocumentService>();
 builder.Services.AddScoped<IPdfCommentService, PdfCommentService>();
 builder.Services.AddScoped<IPublicAccessService, PublicAccessService>();
-builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
+
+// Use Google Storage Service as the primary file storage service
+builder.Services.AddScoped<IGoogleStorageService, GoogleStorageService>();
 
 // Configure CORS
 builder.Services.AddCors(options =>
@@ -220,14 +222,14 @@ builder.Services.AddAuthentication(options =>
 // Configure health checks
 builder.Services.AddHealthChecks()
     .AddCheck<DbContextHealthCheck<ApplicationDbContext>>("database")
-    .AddCheck("storage", () => {
+    .AddCheck("google-storage", () => {
         try
         {
-            var storagePath = Environment.GetEnvironmentVariable("STORAGE_PATH") ??
-                             builder.Configuration["Storage:BasePath"];
-            if (string.IsNullOrEmpty(storagePath) || !Directory.Exists(storagePath))
+            var googleCredentialsPath = Environment.GetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS") ??
+                                       builder.Configuration["GoogleDrive:ServiceAccountPath"];
+            if (string.IsNullOrEmpty(googleCredentialsPath) || !File.Exists(googleCredentialsPath))
             {
-                return Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Unhealthy("Storage path is not configured or does not exist");
+                return Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Unhealthy("Google credentials file is not configured or does not exist");
             }
             return Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy();
         }

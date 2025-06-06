@@ -24,6 +24,16 @@ yarn.lock
 .env.production.local
 *.pem
 .secrets/
+cert.pem
+key.pem
+*.key
+*.crt
+*.cer
+*.p12
+**/credentials/*.json
+**/service-account.json
+**/*-key.json
+**/google-credentials.json
 
 # IDE and editor specific files
 .idea/

@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using PdfManagement.Core.Application.Interfaces;
 using PdfManagement.Services.Interfaces;
@@ -15,11 +15,11 @@ namespace PdfManagement.Infrastructure.Services
         public LocalFileStorageService(IConfiguration configuration)
         {
             // Use the uploads folder in the project directory
-            _storageBasePath = configuration["FileStorage:LocalBasePath"] ?? 
+            _storageBasePath = configuration["FileStorage:LocalBasePath"] ??
                 Path.Combine(Directory.GetCurrentDirectory(), "uploads");
-            
+
             Console.WriteLine($"File storage path: {_storageBasePath}");
-            
+
             // Ensure the storage directory exists
             if (!Directory.Exists(_storageBasePath))
             {
@@ -57,9 +57,9 @@ namespace PdfManagement.Infrastructure.Services
         public async Task<byte[]> GetFileAsync(string filePath)
         {
             var fullPath = Path.Combine(_storageBasePath, filePath);
-            
+
             Console.WriteLine($"Getting file from: {fullPath}");
-            
+
             if (!File.Exists(fullPath))
             {
                 Console.WriteLine($"File not found: {fullPath}");
@@ -72,9 +72,9 @@ namespace PdfManagement.Infrastructure.Services
         public Task<bool> DeleteFileAsync(string filePath)
         {
             var fullPath = Path.Combine(_storageBasePath, filePath);
-            
+
             Console.WriteLine($"Deleting file: {fullPath}");
-            
+
             if (!File.Exists(fullPath))
             {
                 Console.WriteLine($"File not found for deletion: {fullPath}");
