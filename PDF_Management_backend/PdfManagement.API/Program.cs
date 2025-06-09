@@ -81,19 +81,39 @@ else
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
+
 // Configure Kestrel to listen on all addresses
 builder.WebHost.ConfigureKestrel(serverOptions =>
 {
-    serverOptions.ListenAnyIP(5000); // Listen on port 5000 for HTTP
-    serverOptions.ListenAnyIP(5001, listenOptions => // Listen on port 5001 for HTTPS
+    var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+    
+    if (environment == "Production")
     {
-        listenOptions.UseHttps();
-    });
+        // For Render deployment in production, use port 10000 or the port provided by the environment
+        var port = Environment.GetEnvironmentVariable("PORT");
+        if (!string.IsNullOrEmpty(port) && int.TryParse(port, out int portNumber))
+        {
+            serverOptions.ListenAnyIP(portNumber);
+            Console.WriteLine($"Production: Listening on port {portNumber} from environment variable");
+        }
+        else
+        {
+            // Default port for Render in production
+            serverOptions.ListenAnyIP(10000);
+            Console.WriteLine("Production: Listening on default port 10000 for Render");
+        }
+    }
+    else
+    {
+        // Development environment - use standard ports
+        serverOptions.ListenAnyIP(5000); // Listen on port 5000 for HTTP
+        serverOptions.ListenAnyIP(5001, listenOptions => // Listen on port 5001 for HTTPS
+        {
+            listenOptions.UseHttps();
+        });
+        Console.WriteLine("Development: Listening on ports 5000 (HTTP) and 5001 (HTTPS)");
+    }
 });
-
-// Add services to the container.
-//builder.Services.AddDbContext<ApplicationDbContext>(options =>
-//    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // Get connection string from environment variable or configuration
 var connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING") ??
@@ -163,23 +183,29 @@ builder.Services.AddCors(options =>
                 allowedOrigins = allowedOriginsEnv.Split(',')
                     .Where(o => !string.IsNullOrWhiteSpace(o))
                     .ToArray();
+                
+                Console.WriteLine($"CORS configured with origins: {string.Join(", ", allowedOrigins)}");
             }
             else
             {
                 allowedOrigins = new[] { "http://localhost:3000" };
+                Console.WriteLine("CORS configured with default origin: http://localhost:3000");
             }
 
             if (allowedOrigins.Length > 0)
             {
                 policy.WithOrigins(allowedOrigins)
                       .AllowAnyHeader()
-                      .AllowAnyMethod();
+                      .AllowAnyMethod()
+                      .AllowCredentials(); // Add this for cookies/auth if needed
             }
             else
             {
                 policy.AllowAnyOrigin()
                       .AllowAnyHeader()
                       .AllowAnyMethod();
+                
+                Console.WriteLine("CORS configured to allow any origin (not recommended for production)");
             }
         });
 });
@@ -342,6 +368,15 @@ app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthC
 // Simple health check endpoint
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
 
-Console.WriteLine("Starting PDF Management API on ports 5000 (HTTP) and 5001 (HTTPS)");
+// Log deployment environment
+var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development";
+if (environment == "Production")
+{
+    Console.WriteLine($"Starting PDF Management API in Production environment on port 10000 (Render)");
+}
+else
+{
+    Console.WriteLine($"Starting PDF Management API in {environment} environment on ports 5000/5001");
+}
 
 app.Run();
