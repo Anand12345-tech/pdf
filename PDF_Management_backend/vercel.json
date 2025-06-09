@@ -2,6 +2,7 @@
   "version": 2,
   "buildCommand": "dotnet publish -c Release",
   "outputDirectory": "PdfManagement.API/bin/Release/net8.0/publish",
+   "framework": null,
   "builds": [
     {
       "src": "PdfManagement.API/PdfManagement.API.csproj",
