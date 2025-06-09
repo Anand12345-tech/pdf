@@ -88,8 +88,9 @@ debug.log
 *.db
 
 # PDF uploads (if you don't want to include user-uploaded PDFs)
-# Uncomment if needed
-# /uploads/*.pdf
+/uploads/*.pdf
+# Keep the uploads directory itself
+!uploads/.gitkeep
 
 # Cache directories
 .cache/
@@ -116,70 +117,9 @@ typings/
 .rts2_cache_es/
 .rts2_cache_umd/
 .node_repl_history
-# .NET specific
-bin/
-obj/
-.vs/
-*.user
-*.userosscache
-*.suo
-*.userprefs
-*.dbmdl
-*.jfm
-*.pfx
-*.publishsettings
-orleans.codegen.cs
-**/Properties/launchSettings.json
 
-# Visual Studio files
-*.psess
-*.vsp
-*.vspx
-*.sap
-.vs/
-.vscode/
-*_i.c
-*_p.c
-*_i.h
-*.ilk
-*.meta
-*.obj
-*.pch
-*.pdb
-*.pgc
-*.pgd
-*.rsp
-*.sbr
-*.tlb
-*.tli
-*.tlh
-*.tmp
-*.tmp_proj
-*.log
-*.vspscc
-*.vssscc
-.builds
-*.pidb
-*.svclog
-*.scc
+# Test files
+test-download.js
 
-# SQL Server files
-*.mdf
-*.ldf
-*.ndf
-
-# Copilot indices
-**/CopilotIndices/
-
-# Sensitive configuration files
-appsettings.*.json
-!appsettings.Example.json
-appsettings.json
-!appsettings.Template.json
-
-# PDF files in uploads directory (if you don't want to include user-uploaded PDFs)
-uploads/*.pdf
-# Keep the uploads directory itself
-!uploads/.gitkeep
-restart-services.bat
-restart-services.sh
+# Specific files that should be excluded
+shared-document.html

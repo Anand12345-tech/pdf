@@ -25,6 +25,33 @@ bld/
 *.jfm
 *.pfx
 *.publishsettings
+*.psess
+*.vsp
+*.vspx
+*.sap
+*_i.c
+*_p.c
+*_i.h
+*.ilk
+*.meta
+*.obj
+*.pch
+*.pdb
+*.pgc
+*.pgd
+*.rsp
+*.sbr
+*.tlb
+*.tli
+*.tlh
+*.tmp
+*.tmp_proj
+*.vspscc
+*.vssscc
+.builds
+*.pidb
+*.svclog
+*.scc
 
 # Environment files
 .env
@@ -36,10 +63,17 @@ bld/
 .env.production
 appsettings.Development.json
 appsettings.Production.json
+appsettings.json
+!appsettings.Template.json
+!appsettings.Example.json
 
 # Uploaded files
 Storage/Uploads/*
 !Storage/Uploads/.gitkeep
+uploads/*
+!uploads/.gitkeep
+temp/*
+!temp/.gitkeep
 
 # Dependency directories
 node_modules/
@@ -58,8 +92,30 @@ Thumbs.db
 **/*.pem
 **/google-credentials.json
 **/google-drive-credentials.json
+storage-settings.json
+
+# SQL Server files
+*.mdf
+*.ldf
+*.ndf
 
 # Keep example files
 !.env.example
 !appsettings.example.json
 !appsettings.Template.json
+
+# Script files (if you want to exclude them)
+# Uncomment if you want to exclude these
+# *.bat
+# *.sh
+# But keep specific ones that should be in source control
+# !create-migration.bat
+# !create-migration.sh
+# !update-database.bat
+# !update-database.sh
+
+# Test results
+TestResults/
+[Tt]est[Rr]esult*/
+coverage/
+coverage.*

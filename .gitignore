@@ -1,0 +1,47 @@
+# Root level gitignore for the entire project
+
+# Restart scripts
+restart-services.bat
+restart-services.sh
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE and editor specific files
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.sublime-workspace
+.project
+.classpath
+.settings/
+*.code-workspace
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+/tmp/
+*.tmp
+*.bak
+*.swp
+*~
+
+# Obj directory at root level
+/obj/
