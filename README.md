@@ -210,3 +210,8 @@ The system supports two authentication methods:
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+## DeploymentURL
+  https://pdf-frontend-three-beta.vercel.app(front end)
+  https://pdf-deployment-weservice.onrender.com (backend)
+
