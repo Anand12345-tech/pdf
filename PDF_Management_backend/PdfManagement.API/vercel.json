@@ -2,9 +2,6 @@
   "version": 2,
   "buildCommand": "dotnet publish -c Release",
   "outputDirectory": "bin/Release/net8.0/publish",
-  "framework": {
-    "version": "8.0"
-  },
   "rewrites": [
     { "source": "/(.*)", "destination": "/api/$1" }
   ],
