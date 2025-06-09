@@ -192,17 +192,40 @@ namespace PdfManagement.API.Controllers
                     userId,
                     model.ExpiresAt);
 
-                // Generate a frontend URL instead of an API endpoint URL
-                var request = HttpContext.Request;
-                // Replace API port (5000) with frontend port (3000)
-                var host = request.Host.Value.Replace("5000", "3000");
-                var baseUrl = $"{request.Scheme}://{host}";
+                // Check if we're in production environment
+                var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+                string shareUrl;
+
+                if (environment == "Production")
+                {
+                    // In production, use the FRONTEND_URL environment variable
+                    var frontendUrl = Environment.GetEnvironmentVariable("FRONTEND_URL");
+                    if (string.IsNullOrEmpty(frontendUrl))
+                    {
+                        frontendUrl = "https://pdf-frontend-three-beta.vercel.app"; // Fallback to hardcoded URL
+                        _logger.LogWarning("FRONTEND_URL not set in production, using hardcoded fallback: {frontendUrl}");
+                    }
+                    
+                    // Ensure no trailing slash
+                    frontendUrl = frontendUrl.TrimEnd('/');
+                    shareUrl = $"{frontendUrl}/shared-pdf/{token.Token}";
+                    _logger.LogInformation($"Production share URL generated: {shareUrl}");
+                }
+                else
+                {
+                    // In development, use the local URL construction
+                    var request = HttpContext.Request;
+                    var host = request.Host.Value.Replace("5000", "3000");
+                    var baseUrl = $"{request.Scheme}://{host}";
+                    shareUrl = $"{baseUrl}/shared-pdf/{token.Token}";
+                    _logger.LogInformation($"Development share URL generated: {shareUrl}");
+                }
 
                 var response = new ShareDocumentResponse
                 {
                     Token = token.Token,
                     ExpiresAt = token.ExpiresAt,
-                    Url = $"{baseUrl}/shared-pdf/{token.Token}"
+                    Url = shareUrl
                 };
 
                 _logger.LogInformation($"Share link generated for document {id} with token {token.Token}");
@@ -274,13 +297,34 @@ namespace PdfManagement.API.Controllers
 
                 var tokenString = new JwtSecurityTokenHandler().WriteToken(jwtToken);
 
-                // Create the response with the JWT token and share URL
-                // Ensure we create an absolute URL that will work when pasted in any browser
-                var request = HttpContext.Request;
-                // Replace API port (5000) with frontend port (3000)
-                var host = request.Host.Value.Replace("5000", "3000");
-                var baseUrl = $"{request.Scheme}://{host}";
-                var shareUrl = $"{baseUrl}/shared-pdf/{tokenString}";
+                // Check if we're in production environment
+                var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+                string shareUrl;
+
+                if (environment == "Production")
+                {
+                    // In production, use the FRONTEND_URL environment variable
+                    var frontendUrl = Environment.GetEnvironmentVariable("FRONTEND_URL");
+                    if (string.IsNullOrEmpty(frontendUrl))
+                    {
+                        frontendUrl = "https://pdf-frontend-three-beta.vercel.app"; // Fallback to hardcoded URL
+                        _logger.LogWarning("FRONTEND_URL not set in production, using hardcoded fallback: {frontendUrl}");
+                    }
+                    
+                    // Ensure no trailing slash
+                    frontendUrl = frontendUrl.TrimEnd('/');
+                    shareUrl = $"{frontendUrl}/shared-pdf/{tokenString}";
+                    _logger.LogInformation($"Production JWT share URL generated: {shareUrl}");
+                }
+                else
+                {
+                    // In development, use the local URL construction
+                    var request = HttpContext.Request;
+                    var host = request.Host.Value.Replace("5000", "3000");
+                    var baseUrl = $"{request.Scheme}://{host}";
+                    shareUrl = $"{baseUrl}/shared-pdf/{tokenString}";
+                    _logger.LogInformation($"Development JWT share URL generated: {shareUrl}");
+                }
 
                 var response = new JwtShareResponse
                 {
