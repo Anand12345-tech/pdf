@@ -34,6 +34,9 @@ namespace PdfManagement.Core.Application.Services
                 // Check for environment variables first
                 string clientEmail = Environment.GetEnvironmentVariable("GOOGLE_CLIENT_EMAIL");
                 string privateKey = Environment.GetEnvironmentVariable("GOOGLE_PRIVATE_KEY");
+                string projectId = Environment.GetEnvironmentVariable("GOOGLE_PROJECT_ID");
+                
+                _logger.LogInformation($"Checking for Google credentials in environment variables: Client Email exists: {!string.IsNullOrEmpty(clientEmail)}, Private Key exists: {!string.IsNullOrEmpty(privateKey)}");
                 
                 GoogleCredential credential;
                 
@@ -41,48 +44,87 @@ namespace PdfManagement.Core.Application.Services
                 {
                     _logger.LogInformation("Using Google credentials from environment variables");
                     
-                    // Create credentials from environment variables
-                    var serviceAccountCredentialInitializer = new ServiceAccountCredential.Initializer(clientEmail)
+                    try
                     {
-                        ProjectId = Environment.GetEnvironmentVariable("GOOGLE_PROJECT_ID"),
-                        KeyId = Environment.GetEnvironmentVariable("GOOGLE_PRIVATE_KEY_ID")
-                    }.FromPrivateKey(privateKey);
-                    
-                    var serviceAccountCredential = new ServiceAccountCredential(serviceAccountCredentialInitializer);
-                    credential = GoogleCredential.FromServiceAccountCredential(serviceAccountCredential)
-                        .CreateScoped(DriveService.Scope.DriveFile);
+                        // Clean up the private key to avoid Base-64 formatting issues
+                        privateKey = privateKey.Replace("\\\\n", "\\n").Replace("\\n", "\n");
+                        
+                        // Remove any quotes that might have been added
+                        privateKey = privateKey.Replace("\"", "").Replace("'", "");
+                        
+                        // Make sure the private key has the correct format with BEGIN/END markers
+                        if (!privateKey.Trim().StartsWith("-----BEGIN PRIVATE KEY-----"))
+                        {
+                            _logger.LogInformation("Adding BEGIN marker to private key");
+                            privateKey = "-----BEGIN PRIVATE KEY-----\n" + privateKey.Trim();
+                        }
+                        
+                        if (!privateKey.Trim().EndsWith("-----END PRIVATE KEY-----"))
+                        {
+                            _logger.LogInformation("Adding END marker to private key");
+                            privateKey = privateKey.Trim() + "\n-----END PRIVATE KEY-----";
+                        }
+                        
+                        // Remove any extra whitespace or invalid characters
+                        privateKey = privateKey
+                            .Replace("-----BEGIN PRIVATE KEY-----", "-----BEGIN PRIVATE KEY-----\n")
+                            .Replace("-----END PRIVATE KEY-----", "\n-----END PRIVATE KEY-----")
+                            .Trim();
+                        
+                        // Log only the structure, not the actual key content for security
+                        _logger.LogInformation($"Private key format: starts with '{privateKey.Substring(0, 27)}' and ends with '{privateKey.Substring(privateKey.Length - 25)}'");
+                        
+                        // Create credentials from environment variables
+                        var serviceAccountCredentialInitializer = new ServiceAccountCredential.Initializer(clientEmail)
+                        {
+                            ProjectId = projectId
+                        }.FromPrivateKey(privateKey);
+                        
+                        var serviceAccountCredential = new ServiceAccountCredential(serviceAccountCredentialInitializer);
+                        credential = GoogleCredential.FromServiceAccountCredential(serviceAccountCredential)
+                            .CreateScoped(DriveService.Scope.DriveFile);
+                            
+                        _logger.LogInformation("Successfully created Google credentials from environment variables");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to create Google credentials from environment variables");
+                        
+                        // Try an alternative approach using a JSON string
+                        try {
+                            _logger.LogInformation("Attempting alternative approach with JSON credential string");
+                            
+                            var jsonCredential = $@"{{
+                                ""type"": ""service_account"",
+                                ""project_id"": ""{projectId}"",
+                                ""private_key_id"": ""{Environment.GetEnvironmentVariable("GOOGLE_PRIVATE_KEY_ID") ?? "key-id"}"",
+                                ""private_key"": ""{privateKey.Replace("\n", "\\n")}"",
+                                ""client_email"": ""{clientEmail}"",
+                                ""client_id"": ""{Environment.GetEnvironmentVariable("GOOGLE_CLIENT_ID") ?? ""}"",
+                                ""auth_uri"": ""https://accounts.google.com/o/oauth2/auth"",
+                                ""token_uri"": ""https://oauth2.googleapis.com/token"",
+                                ""auth_provider_x509_cert_url"": ""https://www.googleapis.com/oauth2/v1/certs"",
+                                ""client_x509_cert_url"": ""https://www.googleapis.com/robot/v1/metadata/x509/{clientEmail.Replace("@", "%40")}""
+                            }}";
+                            
+                            using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(jsonCredential)))
+                            {
+                                credential = GoogleCredential.FromStream(stream)
+                                    .CreateScoped(DriveService.Scope.DriveFile);
+                            }
+                            
+                            _logger.LogInformation("Successfully created Google credentials using JSON approach");
+                        }
+                        catch (Exception jsonEx) {
+                            _logger.LogError(jsonEx, "Failed to create Google credentials using JSON approach");
+                            throw new Exception("Failed to create Google credentials from environment variables. Check that GOOGLE_PRIVATE_KEY is properly formatted.", ex);
+                        }
+                    }
                 }
                 else
                 {
-                    // Fall back to file-based credentials if environment variables aren't available
-                    var serviceAccountPath = config["GoogleDrive:ServiceAccountPath"];
-                    _logger.LogInformation($"Initializing Google Storage Service with service account file: {serviceAccountPath}");
-                    
-                    if (string.IsNullOrEmpty(serviceAccountPath))
-                    {
-                        throw new ArgumentException("Google Drive service account path is not configured and environment variables are not set");
-                    }
-
-                    if (!File.Exists(serviceAccountPath))
-                    {
-                        // Try to find the pdf_service.txt file as fallback
-                        var pdfServicePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "pdf_service.txt");
-                        if (File.Exists(pdfServicePath))
-                        {
-                            serviceAccountPath = pdfServicePath;
-                            _logger.LogWarning($"Using fallback credentials file: {pdfServicePath}");
-                        }
-                        else
-                        {
-                            throw new FileNotFoundException($"Google Drive service account file not found at {serviceAccountPath}");
-                        }
-                    }
-
-                    using (var stream = new FileStream(serviceAccountPath, FileMode.Open, FileAccess.Read))
-                    {
-                        credential = GoogleCredential.FromStream(stream)
-                            .CreateScoped(DriveService.Scope.DriveFile);
-                    }
+                    _logger.LogError("Google Drive credentials not found in environment variables");
+                    throw new ArgumentException("Google Drive credentials not found in environment variables. Please set GOOGLE_CLIENT_EMAIL and GOOGLE_PRIVATE_KEY.");
                 }
 
                 _driveService = new DriveService(new BaseClientService.Initializer

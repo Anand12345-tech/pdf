@@ -1,17 +1,20 @@
 {
-  "installCommand": "npm install --legacy-peer-deps",
   "version": 2,
+  "buildCommand": "dotnet publish -c Release",
+  "outputDirectory": "PdfManagement.API/bin/Release/net8.0/publish",
+  "framework": {
+    "version": "8.0"
+  },
   "builds": [
     {
-      "src": "index.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "src/**/*",
-      "use": "@vercel/static"
+      "src": "PdfManagement.API/PdfManagement.API.csproj",
+      "use": "@vercel/dotnet"
     }
   ],
   "routes": [
-    { "src": "/(.*)", "dest": "/" }
+    {
+      "src": "/(.*)",
+      "dest": "PdfManagement.API/PdfManagement.API.csproj"
+    }
   ]
 }
