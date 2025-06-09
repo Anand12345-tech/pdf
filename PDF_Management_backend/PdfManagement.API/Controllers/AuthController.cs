@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using PdfManagement.API.Models.Auth;
 using PdfManagement.API.Models.Common;
 using PdfManagement.Core.Application.Interfaces;
@@ -9,6 +10,7 @@ namespace PdfManagement.API.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [AllowAnonymous]
     public class AuthController : ControllerBase
     {
         private readonly IAuthService _authService;

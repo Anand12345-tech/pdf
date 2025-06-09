@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using PdfManagement.API.Attributes;
@@ -19,6 +20,7 @@ namespace PdfManagement.API.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [AllowAnonymous]
     [SwaggerTag("Public endpoints for accessing shared documents")]
     public class PublicController : ControllerBase
     {
