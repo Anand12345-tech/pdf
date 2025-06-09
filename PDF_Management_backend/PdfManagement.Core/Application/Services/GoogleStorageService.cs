@@ -9,6 +9,7 @@ using PdfManagement.Core.Application.Interfaces;
 using System;
 using System.IO;
 using System.Threading.Tasks;
+using System.Text;
 
 namespace PdfManagement.Core.Application.Services
 {
@@ -22,39 +23,66 @@ namespace PdfManagement.Core.Application.Services
         {
             _logger = logger;
             
-            var serviceAccountPath = config["GoogleDrive:ServiceAccountPath"];
-            _googleFolderId = config["GoogleDrive:FolderId"]; // The Drive folder to upload to
+            // Get folder ID from environment variable or config
+            _googleFolderId = Environment.GetEnvironmentVariable("GOOGLE_DRIVE_FOLDER_ID") ?? 
+                             config["GoogleDrive:FolderId"]; // The Drive folder to upload to
             
-            _logger.LogInformation($"Initializing Google Storage Service with service account: {serviceAccountPath}");
             _logger.LogInformation($"Using Google Drive folder ID: {_googleFolderId}");
 
             try
             {
-                if (string.IsNullOrEmpty(serviceAccountPath))
-                {
-                    throw new ArgumentException("Google Drive service account path is not configured");
-                }
-
-                if (!File.Exists(serviceAccountPath))
-                {
-                    // Try to find the pdf_service.txt file as fallback
-                    var pdfServicePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "pdf_service.txt");
-                    if (File.Exists(pdfServicePath))
-                    {
-                        serviceAccountPath = pdfServicePath;
-                        _logger.LogWarning($"Using fallback credentials file: {pdfServicePath}");
-                    }
-                    else
-                    {
-                        throw new FileNotFoundException($"Google Drive service account file not found at {serviceAccountPath}");
-                    }
-                }
-
+                // Check for environment variables first
+                string clientEmail = Environment.GetEnvironmentVariable("GOOGLE_CLIENT_EMAIL");
+                string privateKey = Environment.GetEnvironmentVariable("GOOGLE_PRIVATE_KEY");
+                
                 GoogleCredential credential;
-                using (var stream = new FileStream(serviceAccountPath, FileMode.Open, FileAccess.Read))
+                
+                if (!string.IsNullOrEmpty(clientEmail) && !string.IsNullOrEmpty(privateKey))
                 {
-                    credential = GoogleCredential.FromStream(stream)
+                    _logger.LogInformation("Using Google credentials from environment variables");
+                    
+                    // Create credentials from environment variables
+                    var serviceAccountCredentialInitializer = new ServiceAccountCredential.Initializer(clientEmail)
+                    {
+                        ProjectId = Environment.GetEnvironmentVariable("GOOGLE_PROJECT_ID"),
+                        KeyId = Environment.GetEnvironmentVariable("GOOGLE_PRIVATE_KEY_ID")
+                    }.FromPrivateKey(privateKey);
+                    
+                    var serviceAccountCredential = new ServiceAccountCredential(serviceAccountCredentialInitializer);
+                    credential = GoogleCredential.FromServiceAccountCredential(serviceAccountCredential)
                         .CreateScoped(DriveService.Scope.DriveFile);
+                }
+                else
+                {
+                    // Fall back to file-based credentials if environment variables aren't available
+                    var serviceAccountPath = config["GoogleDrive:ServiceAccountPath"];
+                    _logger.LogInformation($"Initializing Google Storage Service with service account file: {serviceAccountPath}");
+                    
+                    if (string.IsNullOrEmpty(serviceAccountPath))
+                    {
+                        throw new ArgumentException("Google Drive service account path is not configured and environment variables are not set");
+                    }
+
+                    if (!File.Exists(serviceAccountPath))
+                    {
+                        // Try to find the pdf_service.txt file as fallback
+                        var pdfServicePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "pdf_service.txt");
+                        if (File.Exists(pdfServicePath))
+                        {
+                            serviceAccountPath = pdfServicePath;
+                            _logger.LogWarning($"Using fallback credentials file: {pdfServicePath}");
+                        }
+                        else
+                        {
+                            throw new FileNotFoundException($"Google Drive service account file not found at {serviceAccountPath}");
+                        }
+                    }
+
+                    using (var stream = new FileStream(serviceAccountPath, FileMode.Open, FileAccess.Read))
+                    {
+                        credential = GoogleCredential.FromStream(stream)
+                            .CreateScoped(DriveService.Scope.DriveFile);
+                    }
                 }
 
                 _driveService = new DriveService(new BaseClientService.Initializer

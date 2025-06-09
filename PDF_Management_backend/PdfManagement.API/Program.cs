@@ -225,13 +225,23 @@ builder.Services.AddHealthChecks()
     .AddCheck("google-storage", () => {
         try
         {
+            // Check if we have environment variables for Google credentials
+            var googleClientEmail = Environment.GetEnvironmentVariable("GOOGLE_CLIENT_EMAIL");
+            var googlePrivateKey = Environment.GetEnvironmentVariable("GOOGLE_PRIVATE_KEY");
+            
+            if (!string.IsNullOrEmpty(googleClientEmail) && !string.IsNullOrEmpty(googlePrivateKey))
+            {
+                return Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy("Google credentials found in environment variables");
+            }
+            
+            // Fall back to checking for credentials file
             var googleCredentialsPath = Environment.GetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS") ??
                                        builder.Configuration["GoogleDrive:ServiceAccountPath"];
             if (string.IsNullOrEmpty(googleCredentialsPath) || !File.Exists(googleCredentialsPath))
             {
-                return Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Unhealthy("Google credentials file is not configured or does not exist");
+                return Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Unhealthy("Google credentials not found in environment variables or file");
             }
-            return Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy();
+            return Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy("Google credentials file found");
         }
         catch (Exception ex)
         {
