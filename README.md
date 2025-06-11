@@ -9,7 +9,7 @@ The PDF Management System follows a modern client-server architecture:
 - **Frontend**: React-based single-page application (SPA)
 - **Backend**: .NET 8 RESTful API with clean architecture
 - **Database**: PostgreSQL for data persistence
-- **Storage**: Local file system or Google Drive integration
+- **Storage**:  Google Drive integration
 - **Authentication**: JWT-based with OAuth 2.0 support
 
 ## Key Features
@@ -31,12 +31,10 @@ The PDF Management System follows a modern client-server architecture:
 
 - **User Management**
   - User registration and authentication
-  - OAuth integration with Google
   - Role-based access control
   - User settings and preferences
 
 - **Storage Options**
-  - Local file system storage
   - Google Drive integration for cloud storage
   - Configurable storage providers
 
